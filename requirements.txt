@@ -1,0 +1,39 @@
+# Core
+pytz==2018.9
+Django==2.2.4
+django-configurations==2.1
+gunicorn==19.9.0
+newrelic==4.12.0.113
+
+# For the persistence stores
+# psycopg2-binary==2.7.7
+psycopg2==2.8.3
+dj-database-url==0.5.0
+
+# Model Tools
+django-model-utils==3.1.2
+django_unique_upload==0.2.1
+
+# Rest apis
+djangorestframework==3.10.3
+Markdown==3.0.1
+django-filter==2.2.0
+djangorestframework-simplejwt==4.3.0
+
+# Static and Media Storage
+django-storages==1.7.1
+boto3==1.9.93
+
+# Django Env
+django-environ==0.4.5
+
+# Django Cors Headers
+django-cors-headers
+django_s3_storage
+
+# django rest framework extra fields
+django-extra-fields
+
+# Django REST Swagger
+django-rest-swagger
+
