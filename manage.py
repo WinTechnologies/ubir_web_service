@@ -3,8 +3,12 @@ import os
 import sys
 
 if __name__ == "__main__":
-    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "ubir_assist.config")
-    os.environ.setdefault("DJANGO_CONFIGURATION", "Local")
+    if os.getenv('DJANGO_ENV') == 'production':
+        os.environ.setdefault("DJANGO_SETTINGS_MODULE", "ubir_assist.config")
+        os.environ.setdefault("DJANGO_CONFIGURATION", "Production")
+    else:
+        os.environ.setdefault("DJANGO_SETTINGS_MODULE", "ubir_assist.config")
+        os.environ.setdefault("DJANGO_CONFIGURATION", "Local")
 
     try:
         from configurations.management import execute_from_command_line

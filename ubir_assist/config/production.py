@@ -6,11 +6,11 @@ class Production(Common):
     # Postgres
     DATABASES = {
         'default': {
-            'ENGINE': 'django.contrib.gis.db.backends.postgis',
-            'NAME': 'ubirassist',
-            'USER': 'ubirassist',
-            'PASSWORD': 'ax3vJPVr5bvL8fjmgLdF',
-            'HOST': 'klnkfnd-db.coqpipy24mbk.us-east-2.rds.amazonaws.com',
+            'ENGINE': 'django.db.backends.postgresql_psycopg2',
+            'NAME': os.getenv['DBNAME'],
+            'USER': os.getenv['DBUSER'],
+            'PASSWORD': os.getenv['DBPASS'],
+            'HOST': os.getenv['DBHOST'],
             'PORT': '5432',
         }
     }
