@@ -2,6 +2,7 @@
 *.log
 .static_storage/
 .media/
+__pycache__/
 local_settings.py
 *.pyc
 # pyenv
