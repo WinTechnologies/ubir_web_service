@@ -1,6 +1,5 @@
 import os
 import environ
-from django.core.exceptions import ImproperlyConfigured
 from datetime import timedelta
 from distutils.util import strtobool
 from os.path import join
@@ -9,15 +8,6 @@ from configurations import Configuration
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ROOT_DIR = (environ.Path(__file__) - 3)
-
-env = environ.Env()
-
-if not os.path.exists(str(ROOT_DIR.path(".env"))):
-    raise ImproperlyConfigured(
-        'Not Found .env file'
-    )
-
-env.read_env(str(ROOT_DIR.path(".env")))
 
 
 class Common(Configuration):
