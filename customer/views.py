@@ -16,7 +16,7 @@ class CustomerViewSet(ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         phone = request.data['phone']
-        customer, created = Customer.objects.update_or_create(phone=phone, defaults=request.data)
+        customer, created = Customer.objects.update_or_create(defaults=request.data)
         data = CustomerSerializer(instance=customer).data
         headers = self.get_success_headers(data)
         return Response(data, status=status.HTTP_200_OK, headers=headers)
