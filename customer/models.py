@@ -5,7 +5,8 @@ from django.utils.translation import gettext_lazy as _
 
 @python_2_unicode_compatible
 class Customer(models.Model):
-    id = models.IntegerField(primary_key=True)
+    record_number = models.AutoField(primary_key=True)
+    id = models.IntegerField(null=True, blank=True)
     company_id = models.IntegerField(null=True, blank=True)
     store_id = models.CharField(max_length=50, null=True, blank=True)
     table_id = models.IntegerField(null=True, blank=True)
@@ -37,4 +38,5 @@ class Customer(models.Model):
     a5 = models.CharField(max_length=50, null=True, blank=True)
 
     def __str__(self):
-        return self.phone
+        return f"{self.record_number} <-> {self.phone}"
+
