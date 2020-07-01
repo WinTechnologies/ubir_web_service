@@ -15,7 +15,7 @@ class Customer(models.Model):
     user_name = models.CharField(max_length=50, null=True, blank=True)
     action_date_gmt = models.CharField(max_length=50, null=True, blank=True)
     package_id = models.CharField(max_length=50, null=True, blank=True)
-    user_agent = models.CharField(max_length=50, null=True, blank=True)
+    user_agent = models.CharField(max_length=200, null=True, blank=True)
     customer = models.CharField(max_length=50, null=True, blank=True)
     newsletter = models.IntegerField(null=True, blank=True)
     company_name = models.CharField(max_length=50, null=True, blank=True)
