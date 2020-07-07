@@ -22,10 +22,12 @@ class Common(Configuration):
         # Your apps
         'users',
         'customer',
+        'store',
         # Third party apps
         'rest_framework',  # utilities for rest apis
         'django_filters',  # for filtering rest endpoints
         'django_s3_storage',
+        'phone_verify'
     )
 
     # https://docs.djangoproject.com/en/2.0/topics/http/middleware/
@@ -200,5 +202,24 @@ class Common(Configuration):
         'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
         'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
     }
+
+    CORS_ORIGIN_ALLOW_ALL = True
+
+    PHONE_VERIFICATION = {
+        "BACKEND": "phone_verify.backends.twilio.TwilioBackend",
+        "OPTIONS": {
+            "SID": os.getenv('SID'),
+            "SECRET": os.getenv('SECRET'),
+            "FROM": os.getenv('FROM'),
+            "SANDBOX_TOKEN": os.getenv('SANDBOX_TOKEN'),
+        },
+        "TOKEN_LENGTH": 4,
+        "MESSAGE": "Welcome to UBIR Service. Please enter security code {security_code} to proceed.",
+        "APP_NAME": "Phone Verify",
+        "SECURITY_CODE_EXPIRATION_TIME": 3600,  # In seconds only
+        "VERIFY_SECURITY_CODE_ONLY_ONCE": False,
+        # If False, then a security code can be used multiple times for verification
+    }
+
 
 

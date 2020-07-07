@@ -1,6 +1,6 @@
 from rest_framework.routers import SimpleRouter
 
-from .views import CustomerViewSet
+from .views import UBIRWiFiViewSet
 
 router = SimpleRouter()
-router.register(r'customer', CustomerViewSet)
+router.register(r'customer', UBIRWiFiViewSet, basename='customer')

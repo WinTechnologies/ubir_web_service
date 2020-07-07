@@ -1,41 +1,50 @@
-# Core
-pytz==2018.9
+Babel==2.8.0
+boto3==1.9.93
+botocore==1.12.253
+certifi==2020.6.20
+chardet==3.0.4
+coreapi==2.3.3
+coreschema==0.0.4
+dj-database-url==0.5.0
 Django==2.2.4
 django-configurations==2.1
-gunicorn==19.9.0
-newrelic==4.12.0.113
-
-# For the persistence stores
-# psycopg2-binary==2.7.7
-psycopg2==2.8.3
-dj-database-url==0.5.0
-
-# Model Tools
-django-model-utils==3.1.2
-django_unique_upload==0.2.1
-
-# Rest apis
-djangorestframework==3.10.3
-Markdown==3.0.1
-django-filter==2.2.0
-djangorestframework-simplejwt==4.3.0
-
-# Static and Media Storage
-django-storages==1.7.1
-boto3==1.9.93
-
-# Django Env
+django-cors-headers==3.4.0
 django-environ==0.4.5
-
-# Django Cors Headers
-django-cors-headers
-django_s3_storage
-
-# django rest framework extra fields
-django-extra-fields
-
-# Django REST Swagger
-django-rest-swagger
-
-#WhiteNoise
-whitenoise
+django-extra-fields==2.0.5
+django-filter==2.2.0
+django-model-utils==3.1.2
+django-phone-verify==2.0.0
+django-phonenumber-field==4.0.0
+django-rest-swagger==2.2.0
+django-s3-storage==0.13.2
+django-storages==1.7.1
+django-unique-upload==0.2.1
+djangorestframework==3.10.3
+djangorestframework-simplejwt==4.3.0
+docutils==0.15.2
+gunicorn==19.9.0
+idna==2.9
+itypes==1.2.0
+Jinja2==2.11.2
+jmespath==0.10.0
+Markdown==3.0.1
+MarkupSafe==1.1.1
+newrelic==4.12.0.113
+nexmo==2.4.0
+openapi-codec==1.3.2
+phonenumbers==8.12.6
+Pillow==7.2.0
+psycopg2==2.8.3
+PyJWT==1.7.1
+python-dateutil==2.8.1
+python-dotenv==0.14.0
+pytz==2018.9
+requests==2.24.0
+s3transfer==0.2.1
+simplejson==3.17.0
+six==1.15.0
+sqlparse==0.3.1
+twilio==6.43.0
+uritemplate==3.0.1
+urllib3==1.25.9
+whitenoise==5.1.0
