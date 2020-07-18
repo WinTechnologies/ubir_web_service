@@ -14,13 +14,13 @@ from phone_verify.base import response
 
 from .models import Customer, UBIRWiFi
 from .serializers import CustomerSerializer, UBIRWiFiSerializer
-from store.permissions import IsUBIRLoggedIn, IsClientOwner
+from users.permissions import IsUBIRLoggedIn, IsServiceman
 
 
 class UBIRWiFiViewSet(ModelViewSet):
     serializer_class = UBIRWiFiSerializer
     queryset = UBIRWiFi.objects.all()
-    permission_classes = [IsClientOwner]
+    permission_classes = [IsServiceman]
     http_method_names = ['post']
 
     def create(self, request, *args, **kwargs):

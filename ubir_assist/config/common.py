@@ -19,12 +19,17 @@ class Common(Configuration):
         'django.contrib.messages',
         'django.contrib.staticfiles',
         'corsheaders',
+        'channels',
         # Your apps
         'users',
         'customer',
         'store',
+        'service',
+        'order',
+        'chat',
         # Third party apps
         'rest_framework',  # utilities for rest apis
+        'rest_framework.authtoken',
         'django_filters',  # for filtering rest endpoints
         'django_s3_storage',
         'phone_verify'
@@ -49,6 +54,8 @@ class Common(Configuration):
     ROOT_URLCONF = 'ubir_assist.urls'
     SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')
     WSGI_APPLICATION = 'ubir_assist.wsgi.application'
+    # Channels
+    ASGI_APPLICATION = 'ubir_assist.routing.application'
 
     ADMINS = (
         ('Author', 'win.tech0801@gmail.com'),
@@ -221,5 +228,12 @@ class Common(Configuration):
         # If False, then a security code can be used multiple times for verification
     }
 
-
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                "hosts": [('127.0.0.1', 6379)],
+            },
+        },
+    }
 

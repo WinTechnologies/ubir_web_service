@@ -1,42 +1,30 @@
 from rest_framework import viewsets, mixins
 from rest_framework.permissions import AllowAny
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer, TokenVerifySerializer
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView, TokenVerifyView
+from rest_framework.response import Response
+from rest_framework.authtoken.models import Token
+from rest_framework.authtoken.views import ObtainAuthToken
 
 from .models import User
+from service.models import Serviceman
 from .serializers import CreateUserSerializer
 
 
-class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
+class CustomAuthToken(ObtainAuthToken):
 
-    def validate(self, attrs):
+    def post(self, request, *args, **kwargs):
         try:
-            data = super().validate(attrs)
+            serializer = self.serializer_class(data=request.data,
+                                               context={'request': request})
+            serializer.is_valid(raise_exception=True)
+            user = serializer.validated_data['user']
+            token, created = Token.objects.get_or_create(user=user)
+            serviceman = Serviceman.objects.get(user=user)
+            return Response({
+                'token': token.key,
+                'store_id': serviceman.store.store_id
+            })
         except:
-            return {'detail': 'Email or Password is incorrect.'}
-        return data
-
-
-class MyTokenObtainPairView(TokenObtainPairView):
-    serializer_class = MyTokenObtainPairSerializer
-
-
-class MyTokenRefreshSerializer(TokenRefreshSerializer):
-    def validate(self, attrs):
-        super().validate(attrs)
-
-
-class MyTokenRefreshView(TokenRefreshView):
-    serializer_class = MyTokenRefreshSerializer
-
-
-class MyTokenVerifySerializer(TokenVerifySerializer):
-    def validate(self, attrs):
-        super().validate(attrs)
-
-
-class MyTokenVerifyView(TokenVerifyView):
-    serializer_class = MyTokenVerifySerializer
+            return Response({'error': 'Invalid login request'})
 
 
 class UserCreateViewSet(mixins.CreateModelMixin,

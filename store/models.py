@@ -1,13 +1,5 @@
-from uuid import uuid4
 
 from django.db import models
-
-
-class UUIDModel(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
-
-    class Meta:
-        abstract = True
 
 
 class Company(models.Model):
@@ -42,8 +34,7 @@ class Store(models.Model):
 
 
 class ServiceItem(models.Model):
-    title = models.CharField(max_length=150)
-    order = models.IntegerField()
+    title = models.CharField(max_length=150, unique=True)
 
     class Meta:
         verbose_name = 'Service Item'
