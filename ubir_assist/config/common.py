@@ -1,5 +1,6 @@
 import os
 import environ
+from django.core.exceptions import ImproperlyConfigured
 from datetime import timedelta
 from distutils.util import strtobool
 from os.path import join
@@ -8,6 +9,14 @@ from configurations import Configuration
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ROOT_DIR = (environ.Path(__file__) - 3)
+env = environ.Env()
+
+if not os.path.exists(str(ROOT_DIR.path(".env"))):
+    raise ImproperlyConfigured(
+        'Not Found .env file'
+    )
+
+env.read_env(str(ROOT_DIR.path(".env")))
 
 
 class Common(Configuration):
@@ -52,7 +61,7 @@ class Common(Configuration):
 
     ALLOWED_HOSTS = ["*"]
     ROOT_URLCONF = 'ubir_assist.urls'
-    SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')
+    SECRET_KEY = env.str('DJANGO_SECRET_KEY')
     WSGI_APPLICATION = 'ubir_assist.wsgi.application'
     # Channels
     ASGI_APPLICATION = 'ubir_assist.routing.application'
@@ -104,7 +113,7 @@ class Common(Configuration):
 
     # Set DEBUG to False as a default for safety
     # https://docs.djangoproject.com/en/dev/ref/settings/#debug
-    DEBUG = strtobool(os.getenv('DJANGO_DEBUG', 'no'))
+    DEBUG = strtobool(env.str('DJANGO_DEBUG', 'no'))
 
     # Password Validation
     # https://docs.djangoproject.com/en/2.0/topics/auth/passwords/#module-django.contrib.auth.password_validation
@@ -188,7 +197,7 @@ class Common(Configuration):
     # Django Rest Framework
     REST_FRAMEWORK = {
         'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-        'PAGE_SIZE': int(os.getenv('DJANGO_PAGINATION_LIMIT', 10)),
+        'PAGE_SIZE': int(env.str('DJANGO_PAGINATION_LIMIT', 10)),
         'DATETIME_FORMAT': '%Y-%m-%dT%H:%M:%S%z',
         'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
         'DEFAULT_RENDERER_CLASSES': (
@@ -215,10 +224,10 @@ class Common(Configuration):
     PHONE_VERIFICATION = {
         "BACKEND": "phone_verify.backends.twilio.TwilioBackend",
         "OPTIONS": {
-            "SID": os.getenv('SID'),
-            "SECRET": os.getenv('SECRET'),
-            "FROM": os.getenv('FROM'),
-            "SANDBOX_TOKEN": os.getenv('SANDBOX_TOKEN'),
+            "SID": env.str('SID'),
+            "SECRET": env.str('SECRET'),
+            "FROM": env.str('FROM'),
+            "SANDBOX_TOKEN": env.str('SANDBOX_TOKEN'),
         },
         "TOKEN_LENGTH": 4,
         "MESSAGE": "Welcome to UBIR Service. Please enter security code {security_code} to proceed.",

@@ -1,5 +1,5 @@
 import os
-from .common import Common
+from .common import Common, env
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -9,10 +9,10 @@ class Production(Common):
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql_psycopg2',
-            'NAME': os.getenv('DBNAME'),
-            'USER': os.getenv('DBUSER'),
-            'PASSWORD': os.getenv('DBPASS'),
-            'HOST': os.getenv('DBHOST'),
+            'NAME': env.str('DBNAME'),
+            'USER': env.str('DBUSER'),
+            'PASSWORD': env.str('DBPASS'),
+            'HOST': env.str('DBHOST'),
             'PORT': '5432'
         }
     }
@@ -27,7 +27,6 @@ class Production(Common):
     # }
 
     INSTALLED_APPS = Common.INSTALLED_APPS
-    SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')
     # Site
     # https://docs.djangoproject.com/en/2.0/ref/settings/#allowed-hosts
     ALLOWED_HOSTS = ["*"]
