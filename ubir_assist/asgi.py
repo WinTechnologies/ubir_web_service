@@ -13,5 +13,9 @@ if os.getenv('DJANGO_ENV') == 'production':
 else:
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "ubir_assist.config")
     os.environ.setdefault("DJANGO_CONFIGURATION", "Local")
+
+import configurations
+configurations.setup()
+
 django.setup()
 application = get_default_application()
