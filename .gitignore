@@ -2,6 +2,8 @@
 *.log
 .static_storage/
 .media/
+media
+db.sqlite3
 __pycache__/
 local_settings.py
 *.pyc
