@@ -1,44 +1,37 @@
 from django import forms
 from django.contrib import admin
-from .models import ServiceItem, StoreServiceItem, Store, Company
-
-
-# class StoreServiceItemAdminForm(forms.ModelForm):
-#     service_item = forms.ModelMultipleChoiceField(queryset=ServiceItem.objects.order_by('order'))
-#
-#     class Meta:
-#         model = StoreServiceItem
-#         fields = '__all__'
-#
-#
-# class StoreServiceItemAdmin(admin.ModelAdmin):
-#     form = StoreServiceItemAdminForm
-
-
-class MembershipInline(admin.TabularInline):
-    model = StoreServiceItem.service_item.through
+from .models import ServiceItem, TableSeat, Store, Company
 
 
 class ServiceItemAdmin(admin.ModelAdmin):
     pass
 
 
-class StoreServiceItemAdmin(admin.ModelAdmin):
-    inlines = [
-        MembershipInline,
-    ]
-    exclude = ('service_item',)
+class TableSeatAdmin(admin.ModelAdmin):
+    pass
+
+
+class ServiceItemMembershipInline(admin.TabularInline):
+    model = Store.service_item.through
+
+
+class TableSeatMembershipInline(admin.TabularInline):
+    model = Store.table_seat.through
 
 
 class StoreAdmin(admin.ModelAdmin):
-    pass
+    inlines = [
+        ServiceItemMembershipInline,
+        TableSeatMembershipInline
+    ]
+    exclude = ('service_item', 'table_seat', )
 
 
 class CompanyAdmin(admin.ModelAdmin):
     pass
 
 
-admin.site.register(StoreServiceItem, StoreServiceItemAdmin)
 admin.site.register(ServiceItem, ServiceItemAdmin)
+admin.site.register(TableSeat, TableSeatAdmin)
 admin.site.register(Store, StoreAdmin)
 admin.site.register(Company, CompanyAdmin)

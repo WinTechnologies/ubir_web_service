@@ -2,14 +2,15 @@ from datetime import datetime, timezone
 from rest_framework.viewsets import ModelViewSet
 from rest_framework import status
 from rest_framework.response import Response
+from rest_framework.permissions import AllowAny
 from rest_framework.decorators import action
 from django.core.exceptions import ObjectDoesNotExist
 
 from customer.models import Customer
 from order.models import Order
-from .models import Store, StoreServiceItem
-from .serializers import StoreSerializer, ServiceItemSerializer, StoreServiceItemSerializer
-from users.permissions import IsOnTable
+from .models import Store, Company
+from .serializers import StoreSerializer, ServiceItemSerializer
+from users.permissions import IsOnTable, IsUBIRLoggedIn, IsServiceman
 
 
 class StoreViewSet(ModelViewSet):
@@ -25,27 +26,26 @@ class StoreViewSet(ModelViewSet):
         table_id = request.data['tableId']
         response_data = {}
         try:
-            customer = Customer.objects.get(phone=phone_number)
-            customer.company_id = company_id
-            customer.store_id = store_id
-            customer.table_id = table_id
-            customer.save()
+            customer = Customer.objects.get(phone=phone_number,
+                                            is_in_store=True,
+                                            company_id=company_id,
+                                            store_id=store_id,
+                                            table_id=table_id)
             store_id = customer.store_id
             store = Store.objects.get(store_id=store_id)
             order_items = []
-            for store_service_item in StoreServiceItem.objects.filter(store__store_id=store_id):
-                for service_item in store_service_item.service_item.all():
-                    data = ServiceItemSerializer(instance=service_item).data
-                    try:
-                        order = Order.objects.get(customer=customer, store=store, service_item=service_item, table_id=table_id)
-                        data['quantity'] = order.quantity
-                        data['status'] = order.status
-                        data['timer'] = int((datetime.now(timezone.utc) - order.start_time).total_seconds())
-                    except:
-                        data['quantity'] = 0
-                        data['timer'] = 0
-                        data['status'] = Order.PENDING
-                    order_items.append(data)
+            for service_item in store.service_item.all():
+                data = ServiceItemSerializer(instance=service_item).data
+                try:
+                    order = Order.objects.filter(customer=customer, store=store, service_item=service_item, table_id=table_id).exclude(status=Order.COMPLETED).first()
+                    data['quantity'] = order.quantity
+                    data['status'] = order.status
+                    data['timer'] = int((datetime.now(timezone.utc) - order.start_time).total_seconds())
+                except:
+                    data['quantity'] = 0
+                    data['timer'] = 0
+                    data['status'] = Order.PENDING
+                order_items.append(data)
             response_data['order_items'] = order_items
             response_data['store_logo'] = store.logo.url
             response_data['store_id'] = store.store_id
@@ -58,3 +58,41 @@ class StoreViewSet(ModelViewSet):
             return Response(response_data, status=status.HTTP_200_OK)
         except ObjectDoesNotExist:
             return Response({"message": "Please verify your phone number."})
+
+    @action(detail=False, methods=['post'], permission_classes=[IsUBIRLoggedIn], url_path='get_store_logo')
+    def get_store_logo(self, request):
+        company_id = request.data['companyId']
+        store_id = request.data['storeId']
+        response_data = {}
+        try:
+            store = Store.objects.get(store_id=store_id)
+            response_data['store_logo'] = store.logo.url
+            return Response(response_data, status=status.HTTP_200_OK)
+        except ObjectDoesNotExist:
+            return Response({"message": "Please verify your phone number."})
+
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny], url_path='company_store_table_valid')
+    def company_store_table_valid(self, request):
+        try:
+            company_id = request.data['companyId']
+        except KeyError:
+            return Response({"error": "The company id does not exist."})
+        try:
+            store_id = request.data['storeId']
+        except KeyError:
+            return Response({"error": "The store id does not exist"})
+        try:
+            table_id = request.data['tableId']
+        except KeyError:
+            return Response({"error": "The table id does not exist."})
+        try:
+            company = Company.objects.get(company_id=company_id)
+        except Company.DoesNotExist:
+            return Response({"error": "The company id is invalid."})
+        try:
+            store = Store.objects.get(store_id=store_id, company=company)
+        except Store.DoesNotExist:
+            return Response({"error": "The store id is invalid."})
+        if not store.table_seat.filter(table_seat=table_id).exists():
+            return Response({"error": "The table id is invalid."})
+        return Response({"error": ""}, status=status.HTTP_200_OK)

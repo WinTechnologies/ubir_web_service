@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Store, ServiceItem, StoreServiceItem
+from .models import Store, ServiceItem
 
 
 class StoreSerializer(serializers.ModelSerializer):
@@ -13,11 +13,3 @@ class ServiceItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = ServiceItem
         fields = '__all__'
-
-
-class StoreServiceItemSerializer(serializers.ModelSerializer):
-    service_item = ServiceItemSerializer(read_only=True, many=True)
-
-    class Meta:
-        model = StoreServiceItem
-        fields = ('id', 'service_item')

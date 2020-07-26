@@ -8,14 +8,55 @@ from django.core.exceptions import ObjectDoesNotExist
 
 from .models import Serviceman
 from order.models import Order
-from store.models import ServiceItem, StoreServiceItem, Store
+from store.models import ServiceItem, Store
+from customer.models import Customer
+from chat.models import Message
 from .serializers import ServicemanSerializer
 from order.serializers import OrderSerializer
+from users.permissions import IsServiceman
 
 
 class ServiceViewSet(ModelViewSet):
     serializer_class = ServicemanSerializer
     queryset = Serviceman.objects.all()
+
+    @action(detail=False, methods=['post'], permission_classes=[IsServiceman], url_path='get_store_configs')
+    def get_store_configs(self, request):
+        store_id = request.data['storeId']
+        try:
+            store = Store.objects.get(store_id=store_id)
+            response_data = []
+            for table_seat in store.table_seat.all():
+                data = {}
+                data['table_seat'] = table_seat.table_seat
+                data['table_filter'] = False # Not Checked
+                data['reset_table'] = 'Reset'
+                data['table_status'] = 'Open'  # Open
+                response_data.append(data)
+            return Response(response_data, status=status.HTTP_200_OK)
+        except ObjectDoesNotExist:
+            return Response({"message": "Internal Server Error"})
+
+    @action(detail=False, methods=['post'], permission_classes=[IsServiceman], url_path='reset_table')
+    def reset_table(self, request):
+        table_seat = request.data['table_seat']
+        store_id = request.data['store_id']
+        try:
+            response_data = []
+            customer = Customer.objects.get(is_in_store=True, store_id=store_id, table_id=table_seat)
+            customer.is_in_store = True
+            customer.save()
+            orders = Order.objects.filter(customer=customer, store__store_id=store_id, table_id=table_seat)
+            for order in orders:
+                order.status = Order.COMPLETED
+                order.save()
+            messages = Message.objects.filter(store_id=store_id, table_id=table_seat, is_seen=False)
+            for message in messages:
+                message.is_seen = True
+                message.save()
+            return Response({"message": "Success"}, status=status.HTTP_200_OK)
+        except ObjectDoesNotExist:
+            return Response({"message": "Internal Server Error"})
 
     @action(detail=False, methods=['post'], url_path='get_order_information')
     def get_order_information(self, request):

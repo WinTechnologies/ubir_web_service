@@ -72,6 +72,15 @@ class CustomVerificationViewSet(VerificationViewSet):
         if not wifi_logins:
             return response.Ok({"error": "You must login to the store Guest WiFi to use this service.  "
                                          "Please login to \"UBIRserve WiFi\""})
+        company_id = request.data.pop('companyId')
+        store_id = request.data.pop('storeId')
+        table_id = request.data.pop('tableId')
+        customers = Customer.objects.filter(is_in_store=True,
+                                            phone=phone_number_without_code,
+                                            company_id=company_id,
+                                            store_id=store_id)
+        if customers.exists():
+            return response.Ok({"error": "This phone number is already logged in this company/store."})
         serializer = PhoneSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         session_token = send_security_code_and_generate_session_token(
@@ -86,11 +95,18 @@ class CustomVerificationViewSet(VerificationViewSet):
         serializer_class=SMSVerificationSerializer,
     )
     def verify(self, request):
+        company_id = request.data.pop('companyId')
+        store_id = request.data.pop('storeId')
+        table_id = request.data.pop('tableId')
         serializer = SMSVerificationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         phone_number_without_code = request.data['phone_number_without_code']
         try:
-            customer, created = Customer.objects.get_or_create(phone=phone_number_without_code)
+            customer = Customer.objects.create(phone=phone_number_without_code,
+                                            company_id=company_id,
+                                            store_id=store_id,
+                                            table_id=table_id,
+                                            is_in_store=True)
             customer.session_token = request.data['session_token']
             customer.save()
             return response.Ok({"message": "Security code is valid."})

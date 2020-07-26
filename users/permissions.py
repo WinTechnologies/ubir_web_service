@@ -18,13 +18,25 @@ class IsUBIRLoggedIn(BasePermission):
 class IsOnTable(BasePermission):
     def has_permission(self, request, view):
         try:
+            company_id = request.data['companyId']
+            store_id = request.data['storeId']
+            table_id = request.data['tableId']
             phone_number_without_code = request.data['phone_number']
             session_token = request.data['session_token']
-            customer = Customer.objects.get(phone=phone_number_without_code)
+            customer = Customer.objects.get(is_in_store=True,
+                                            phone=phone_number_without_code,
+                                            company_id=company_id,
+                                            store_id=store_id,
+                                            table_id=table_id)
             if customer.session_token == session_token:
                 return True
         except:
             pass
+        return False
+
+
+class IsServiceman(BasePermission):
+    def has_permission(self, request, view):
         try:
             token = request.data['token']
             Token.objects.get(key=token)
@@ -32,11 +44,3 @@ class IsOnTable(BasePermission):
         except:
             pass
         return False
-
-
-class IsServiceman(BasePermission):
-    def has_object_permission(self, request, view, obj):
-        if request.method in SAFE_METHODS:
-            return True
-
-        return hasattr(request.user, "service") and obj == request.user.service

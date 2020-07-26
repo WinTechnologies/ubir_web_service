@@ -14,6 +14,7 @@ class Customer(models.Model):
     session_token = models.CharField(max_length=512, null=True, blank=True)
     start_time = models.DateTimeField(default=datetime.now)
     end_time = models.DateTimeField(null=True, blank=True)
+    is_in_store = models.BooleanField(default=False, verbose_name="True if a customer is already logged in, False if not")
 
     def __str__(self):
         return f"{self.record_number} <-> {self.phone}"

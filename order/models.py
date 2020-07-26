@@ -30,4 +30,4 @@ class Order(models.Model):
     status = models.CharField(choices=CHOICES, default=PENDING, max_length=25)
 
     def __str__(self):
-        return f"Store {self.store.store_id} - Table {self.table_id} - {self.service_item.title}"
+        return f"Store {self.store.store_id} - Table {self.table_id} - {self.service_item.title} - {self.status}"
