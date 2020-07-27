@@ -46,7 +46,7 @@ class ServiceViewSet(ModelViewSet):
             customer = Customer.objects.get(is_in_store=True, store_id=store_id, table_id=table_seat)
             customer.is_in_store = True
             customer.save()
-            orders = Order.objects.filter(customer=customer, store__store_id=store_id, table_id=table_seat)
+            orders = Order.objects.filter(store__store_id=store_id, table_id=table_seat)
             for order in orders:
                 order.status = Order.COMPLETED
                 order.save()
