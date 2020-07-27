@@ -20,7 +20,7 @@ from users.permissions import IsUBIRLoggedIn, IsServiceman
 class UBIRWiFiViewSet(ModelViewSet):
     serializer_class = UBIRWiFiSerializer
     queryset = UBIRWiFi.objects.all()
-    permission_classes = [IsServiceman]
+    permission_classes = [AllowAny]
     http_method_names = ['post']
 
     def create(self, request, *args, **kwargs):
