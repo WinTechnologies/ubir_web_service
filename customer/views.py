@@ -77,9 +77,11 @@ class CustomVerificationViewSet(VerificationViewSet):
         store_id = request.data.pop('storeId')
         table_id = request.data.pop('tableId')
         try:
-            Customer.objects.get(is_in_store=False, phone=phone_number_without_code)
+            customer = Customer.objects.get(phone=phone_number_without_code)
+            if customer.is_in_store:
+                return response.Ok({"error": "This phone number is already logged in this company/store."})
         except:
-            return response.Ok({"error": "This phone number is already logged in this company/store."})
+            pass
         try:
             store_table_status = StoreTableStatus.objects.get(store__store_id=store_id, table_seat=table_id)
             if store_table_status.status == StoreTableStatus.CLOSED:
