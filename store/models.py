@@ -1,5 +1,7 @@
 
 from django.db import models
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from django.core.exceptions import NON_FIELD_ERRORS, ValidationError
 
 
@@ -60,3 +62,34 @@ class Store(models.Model):
     def clean(self):
         if not self.store_id.startswith("{}.".format(self.company.company_id)):
             raise ValidationError({"store_id": "Store ID should start with '{Company ID}.'"})
+
+
+class StoreTableStatus(models.Model):
+    OPEN = 'Open'
+    CLOSED = 'Closed'
+    CHOICES = (
+        (OPEN, OPEN),
+        (CLOSED, CLOSED),
+    )
+    CHOICES_DICT = dict(CHOICES)
+    store = models.ForeignKey(Store, on_delete=models.CASCADE)
+    table_seat = models.CharField(max_length=10, unique=True)
+    status = models.CharField(choices=CHOICES, default=OPEN, max_length=25)
+
+    class Meta:
+        verbose_name = 'Table/Seat'
+        verbose_name_plural = 'Tables/Seats'
+
+    def __str__(self):
+        return self.table_seat
+
+
+@receiver(post_save, sender=Store)
+def create_store(sender, instance, created, **kwargs):
+    table_seats = instance.table_seat.all()
+    for table_seat in table_seats:
+        try:
+            StoreTableStatus.objects.get(store=instance, table_seat=table_seat.table_seat)
+        except:
+            store_table_status = StoreTableStatus(store=instance, table_seat=table_seat.table_seat, status=StoreTableStatus.OPEN)
+            store_table_status.save()

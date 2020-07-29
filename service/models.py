@@ -17,3 +17,16 @@ class Serviceman(models.Model):
 
     def __str__(self):
         return self.user.username
+
+
+@python_2_unicode_compatible
+class ServicemanConfig(models.Model):
+    serviceman = models.ForeignKey(Serviceman, on_delete=models.CASCADE, verbose_name="Service Person")
+    table_seat = models.CharField(max_length=10)
+
+    class Meta:
+        verbose_name = _('Service Person Config')
+        verbose_name_plural = _('Service Person Config')
+
+    def __str__(self):
+        return f"{self.serviceman.user.username} - {self.table_seat}"

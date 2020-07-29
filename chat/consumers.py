@@ -8,7 +8,7 @@ from service.models import Serviceman
 from order.models import Order
 from chat.models import Message
 from customer.models import Customer
-from store.models import Store, ServiceItem
+from store.models import Store, ServiceItem, StoreTableStatus
 from chat.serializers import MessageSerializer
 from order.serializers import OrderSerializer
 
@@ -201,6 +201,60 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     'message': response_data
                 }
             )
+        elif data['command'] == 'open_close_table':
+            token = data['token']
+            table_seat = data['table_seat']
+            token = Token.objects.get(key=token)
+            serviceman = Serviceman.objects.get(user=token.user)
+            try:
+                store_table_status = StoreTableStatus.objects.get(store=serviceman.store, table_seat=table_seat)
+                if store_table_status.status == StoreTableStatus.OPEN:
+                    store_table_status.status = StoreTableStatus.CLOSED
+                else:
+                    store_table_status.status = StoreTableStatus.OPEN
+                store_table_status.save()
+                response_data = {"status": store_table_status.status, "table_seat": table_seat}
+            except:
+                response_data = {}
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'open_close_table',
+                    'message': response_data
+                }
+            )
+        elif data['command'] == 'reset_table':
+            token = data['token']
+            table_seat = data['table_seat']
+            store_id = data['store_id']
+            token = Token.objects.get(key=token)
+            serviceman = Serviceman.objects.get(user=token.user)
+            try:
+                response_data = {}
+                try:
+                    customer = Customer.objects.get(is_in_store=True, store_id=store_id, table_id=table_seat)
+                    customer.is_in_store = False
+                    customer.save()
+                except:
+                    pass
+                orders = Order.objects.filter(store__store_id=store_id, table_id=table_seat)
+                for order in orders:
+                    order.status = Order.COMPLETED
+                    order.save()
+                messages = Message.objects.filter(store_id=store_id, table_id=table_seat, is_seen=False)
+                for message in messages:
+                    message.is_seen = True
+                    message.save()
+                response_data = {"message": "success", "store_id": store_id, "table_id": table_seat}
+            except:
+                response_data = {}
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'reset_table',
+                    'message': response_data
+                }
+            )
 
     # Receive message from room group
     async def fetch_table_messages(self, data):
@@ -260,4 +314,18 @@ class ChatConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             'message': message,
             'command': 'set_completed_order_item'
+        }))
+
+    async def open_close_table(self, data):
+        message = data['message']
+        await self.send(text_data=json.dumps({
+            'message': message,
+            'command': 'set_open_close_table'
+        }))
+
+    async def reset_table(self, data):
+        message = data['message']
+        await self.send(text_data=json.dumps({
+            'message': message,
+            'command': 'set_reset_table'
         }))

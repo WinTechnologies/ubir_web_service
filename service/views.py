@@ -6,9 +6,9 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.core.exceptions import ObjectDoesNotExist
 
-from .models import Serviceman
+from .models import Serviceman, ServicemanConfig
 from order.models import Order
-from store.models import ServiceItem, Store
+from store.models import ServiceItem, Store, StoreTableStatus
 from customer.models import Customer
 from chat.models import Message
 from .serializers import ServicemanSerializer
@@ -24,14 +24,20 @@ class ServiceViewSet(ModelViewSet):
     def get_store_configs(self, request):
         store_id = request.data['storeId']
         try:
+            serviceman = Serviceman.objects.get(user=request.user)
             store = Store.objects.get(store_id=store_id)
             response_data = []
             for table_seat in store.table_seat.all():
                 data = {}
                 data['table_seat'] = table_seat.table_seat
-                data['table_filter'] = False # Not Checked
+                try:
+                    serviceman_config = ServicemanConfig.objects.get(serviceman=serviceman, table_seat=table_seat.table_seat)
+                    data['table_filter'] = True  # Selected
+                except:
+                    data['table_filter'] = False # Not Selected
                 data['reset_table'] = 'Reset'
-                data['table_status'] = 'Open'  # Open
+                store_table_status = StoreTableStatus.objects.get(store=serviceman.store, table_seat=table_seat)
+                data['table_status'] = store_table_status.status  # Open
                 response_data.append(data)
             return Response(response_data, status=status.HTTP_200_OK)
         except ObjectDoesNotExist:
@@ -58,11 +64,43 @@ class ServiceViewSet(ModelViewSet):
         except ObjectDoesNotExist:
             return Response({"message": "Internal Server Error"})
 
+    @action(detail=False, methods=['post'], permission_classes=[IsServiceman], url_path='open_close_table')
+    def open_close_table(self, request):
+        table_seat = request.data['table_seat']
+        serviceman = Serviceman.objects.get(user=request.user)
+        try:
+            store_table_status = StoreTableStatus.objects.get(store=serviceman.store, table_seat=table_seat)
+            if store_table_status.status == StoreTableStatus.OPEN:
+                store_table_status.status = StoreTableStatus.CLOSED
+            else:
+                store_table_status.status = StoreTableStatus.OPEN
+            store_table_status.save()
+            return Response({"message": store_table_status.status}, status=status.HTTP_200_OK)
+        except ObjectDoesNotExist:
+            return Response({"message": "Internal Server Error"})
+
+    @action(detail=False, methods=['post'], permission_classes=[IsServiceman], url_path='select_table')
+    def select_table(self, request):
+        table_seat = request.data['table_seat']
+        selected = request.data['selected']
+        try:
+            serviceman = Serviceman.objects.get(user=request.user)
+            if selected:
+                ServicemanConfig.objects.get_or_create(serviceman=serviceman, table_seat=table_seat)
+            else:
+                ServicemanConfig.objects.filter(serviceman=serviceman, table_seat=table_seat).delete()
+            return Response({"message": "Success"}, status=status.HTTP_200_OK)
+        except ObjectDoesNotExist:
+            return Response({"message": "Internal Server Error"})
+
     @action(detail=False, methods=['post'], url_path='get_order_information')
     def get_order_information(self, request):
         try:
-            table_ids = request.data['table_ids']
+            table_ids = []
             serviceman = Serviceman.objects.get(user=request.user)
+            serviceman_configs = ServicemanConfig.objects.filter(serviceman=serviceman)
+            for serviceman_config in serviceman_configs:
+                table_ids.append(serviceman_config.table_seat)
             orders = Order.objects.filter(store=serviceman.store, table_id__in=table_ids).exclude(status=Order.COMPLETED)
             response_data = []
             for order in orders:

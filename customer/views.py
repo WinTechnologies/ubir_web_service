@@ -13,6 +13,7 @@ from phone_verify.services import send_security_code_and_generate_session_token
 from phone_verify.base import response
 
 from .models import Customer, UBIRWiFi
+from store.models import StoreTableStatus
 from .serializers import CustomerSerializer, UBIRWiFiSerializer
 from users.permissions import IsUBIRLoggedIn, IsServiceman
 
@@ -75,12 +76,17 @@ class CustomVerificationViewSet(VerificationViewSet):
         company_id = request.data.pop('companyId')
         store_id = request.data.pop('storeId')
         table_id = request.data.pop('tableId')
-        customers = Customer.objects.filter(is_in_store=True,
-                                            phone=phone_number_without_code,
-                                            company_id=company_id,
-                                            store_id=store_id)
-        if customers.exists():
+        try:
+            Customer.objects.get(is_in_store=False, phone=phone_number_without_code)
+        except:
             return response.Ok({"error": "This phone number is already logged in this company/store."})
+        try:
+            store_table_status = StoreTableStatus.objects.get(store__store_id=store_id, table_seat=table_id)
+            if store_table_status.status == StoreTableStatus.CLOSED:
+                return response.Ok({"error": "The table is closed now. Please ask the service person."})
+        except:
+            return response.Ok({"error": "This table is closed. "
+                                         "Please tell a server or the manager you need a new table"})
         serializer = PhoneSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         session_token = send_security_code_and_generate_session_token(
@@ -102,11 +108,11 @@ class CustomVerificationViewSet(VerificationViewSet):
         serializer.is_valid(raise_exception=True)
         phone_number_without_code = request.data['phone_number_without_code']
         try:
-            customer = Customer.objects.create(phone=phone_number_without_code,
-                                            company_id=company_id,
-                                            store_id=store_id,
-                                            table_id=table_id,
-                                            is_in_store=True)
+            customer = Customer.objects.get(is_in_store=False, phone=phone_number_without_code)
+            customer.company_id = company_id
+            customer.store_id = store_id
+            customer.table_id = table_id
+            customer.is_in_store = True
             customer.session_token = request.data['session_token']
             customer.save()
             return response.Ok({"message": "Security code is valid."})
