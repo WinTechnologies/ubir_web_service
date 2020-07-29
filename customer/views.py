@@ -110,13 +110,13 @@ class CustomVerificationViewSet(VerificationViewSet):
         serializer.is_valid(raise_exception=True)
         phone_number_without_code = request.data['phone_number_without_code']
         try:
-            customer = Customer.objects.get(is_in_store=False, phone=phone_number_without_code)
-            customer.company_id = company_id
-            customer.store_id = store_id
-            customer.table_id = table_id
-            customer.is_in_store = True
-            customer.session_token = request.data['session_token']
-            customer.save()
-            return response.Ok({"message": "Security code is valid."})
+            customer = Customer.objects.get(phone=phone_number_without_code)
         except:
-            return response.Ok({"message": "Something is wrong."})
+            customer = Customer(phone=phone_number_without_code)
+        customer.company_id = company_id
+        customer.store_id = store_id
+        customer.table_id = table_id
+        customer.is_in_store = True
+        customer.session_token = request.data['session_token']
+        customer.save()
+        return response.Ok({"message": "Security code is valid."})
