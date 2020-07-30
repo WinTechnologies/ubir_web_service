@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from rest_framework.authtoken.models import Token
 from channels.generic.websocket import AsyncWebsocketConsumer
 
-from service.models import Serviceman
+from service.models import Serviceman, ServicemanConfig
 from order.models import Order
 from chat.models import Message
 from customer.models import Customer
@@ -59,7 +59,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             else:
                 if order.status == Order.COMPLETED:
                     order.start_time = datetime.now(timezone.utc)
-            order.status = Order.PENDING
+            # order.status = Order.PENDING
             order.save()
             data = OrderSerializer(instance=order).data
             data['timer'] = int((datetime.now(timezone.utc) - order.start_time).total_seconds())
@@ -172,10 +172,16 @@ class ChatConsumer(AsyncWebsocketConsumer):
             )
         elif data['command'] == 'fetch_messages':
             store_id = data['store_id']
-            table_ids = data['table_ids']
+            token = data['token']
+            table_ids = []
             store = Store.objects.get(store_id=store_id)
+            token = Token.objects.get(key=token)
+            serviceman = Serviceman.objects.get(user=token.user)
+            serviceman_configs = ServicemanConfig.objects.filter(serviceman=serviceman)
+            for serviceman_config in serviceman_configs:
+                table_ids.append(serviceman_config.table_seat)
             response_data = []
-            for table_id in data['table_ids']:
+            for table_id in table_ids:
                 for service_item in store.service_item.all():
                     item = {}
                     item['table_id'] = table_id
