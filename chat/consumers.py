@@ -161,6 +161,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 answer = Message.objects.filter(store_id=store_id, table_id=table_id, item_title=service_item.title, type=Message.ANSWER, is_seen=False).order_by('-created_at').first()
                 if answer:
                     item['answer'] = answer.message
+                item['table_id'] = table_id
+                item['store_id'] = store_id
                 response_data.append(item)
 
             await self.channel_layer.group_send(
