@@ -73,7 +73,7 @@ class StoreTableStatus(models.Model):
     )
     CHOICES_DICT = dict(CHOICES)
     store = models.ForeignKey(Store, on_delete=models.CASCADE)
-    table_seat = models.CharField(max_length=10, unique=True)
+    table_seat = models.CharField(max_length=10)
     status = models.CharField(choices=CHOICES, default=OPEN, max_length=25)
 
     class Meta:
@@ -84,12 +84,12 @@ class StoreTableStatus(models.Model):
         return self.table_seat
 
 
-@receiver(post_save, sender=Store)
-def create_store(sender, instance, created, **kwargs):
-    table_seats = instance.table_seat.all()
-    for table_seat in table_seats:
-        try:
-            StoreTableStatus.objects.get(store=instance, table_seat=table_seat.table_seat)
-        except:
-            store_table_status = StoreTableStatus(store=instance, table_seat=table_seat.table_seat, status=StoreTableStatus.OPEN)
-            store_table_status.save()
+# @receiver(post_save, sender=Store)
+# def create_store(sender, instance, created, **kwargs):
+#     table_seats = instance.table_seat.all()
+#     for table_seat in table_seats:
+#         try:
+#             StoreTableStatus.objects.get(store=instance, table_seat=table_seat.table_seat)
+#         except:
+#             store_table_status = StoreTableStatus(store=instance, table_seat=table_seat.table_seat, status=StoreTableStatus.OPEN)
+#             store_table_status.save()
