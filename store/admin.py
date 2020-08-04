@@ -1,5 +1,6 @@
 from django import forms
 from django.contrib import admin
+from django_better_admin_arrayfield.admin.mixins import DynamicArrayMixin
 from .models import ServiceItem, TableSeat, Store, Company, StoreTableStatus
 
 
@@ -19,7 +20,7 @@ class TableSeatMembershipInline(admin.TabularInline):
     model = Store.table_seat.through
 
 
-class StoreAdmin(admin.ModelAdmin):
+class StoreAdmin(admin.ModelAdmin, DynamicArrayMixin):
     inlines = [
         ServiceItemMembershipInline,
         TableSeatMembershipInline

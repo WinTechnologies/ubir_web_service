@@ -1,6 +1,7 @@
 # chat/consumers.py
 import json
 from datetime import datetime, timezone
+from django.db.models import Q
 from rest_framework.authtoken.models import Token
 from channels.generic.websocket import AsyncWebsocketConsumer
 
@@ -47,7 +48,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
             order = None
             created = False
             try:
-                order = Order.objects.get(customer=customer, store=store, service_item=service_item, status=Order.INPROGRESS)
+                order = Order.objects.get(Q(customer=customer) & Q(store=store) & Q(service_item=service_item) & (Q(status=Order.INPROGRESS)|Q(status=Order.INPROGRESS_PENDING)))
+                order.status = Order.INPROGRESS_PENDING
             except:
                 pass
             if not order:

@@ -29,6 +29,7 @@ class Common(Configuration):
         'django.contrib.staticfiles',
         'corsheaders',
         'channels',
+        'django_better_admin_arrayfield',
         # Your apps
         'users',
         'customer',

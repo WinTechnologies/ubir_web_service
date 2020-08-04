@@ -10,11 +10,13 @@ from store.models import Store, ServiceItem
 class Order(models.Model):
     PENDING = 'PENDING'
     INPROGRESS = 'INPROGRESS'
+    INPROGRESS_PENDING = 'INPROGRESS_PENDING'
     COMPLETED = 'COMPLETED'
 
     CHOICES = (
         (PENDING, PENDING),
         (INPROGRESS, INPROGRESS),
+        (INPROGRESS_PENDING, INPROGRESS_PENDING),
         (COMPLETED, COMPLETED)
     )
     CHOICES_DICT = dict(CHOICES)
