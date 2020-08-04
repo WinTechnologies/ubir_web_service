@@ -20,7 +20,7 @@ class TableSeatMembershipInline(admin.TabularInline):
     model = Store.table_seat.through
 
 
-class StoreAdmin(admin.ModelAdmin, DynamicArrayMixin):
+class StoreAdmin(admin.ModelAdmin):
     inlines = [
         ServiceItemMembershipInline,
         TableSeatMembershipInline
