@@ -13,7 +13,7 @@ from phone_verify.services import send_security_code_and_generate_session_token
 from phone_verify.base import response
 
 from .models import Customer, UBIRWiFi
-from store.models import StoreTableStatus
+from store.models import StoreTableStatus, Store
 from .serializers import CustomerSerializer, UBIRWiFiSerializer
 from users.permissions import IsUBIRLoggedIn, IsServiceman
 
@@ -68,25 +68,40 @@ class CustomVerificationViewSet(VerificationViewSet):
         serializer_class=PhoneSerializer,
     )
     def register(self, request):
-        phone_number_without_code = request.data['phone_number_without_code']
-        wifi_logins = UBIRWiFi.objects.filter(phone=phone_number_without_code)
-        if not wifi_logins:
-            return response.Ok({"error": "You must login to the store Guest WiFi to use this service.  "
-                                         "Please login to \"UBIRserve WiFi\""})
         company_id = request.data.pop('companyId')
         store_id = request.data.pop('storeId')
         table_id = request.data.pop('tableId')
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0]
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+        request_ip_address = ip
+        try:
+            store = Store.objects.get(store_id=store_id)
+        except Store.DoesNotExist:
+            return response.Ok({"error": "Store does not exist."})
+        if not store.ip_addresses:
+            return response.Ok({"error": "Store does not have IP addresses defined yet."})
+        if "0.0.0.0" not in store.ip_addresses:
+            if request_ip_address not in store.ip_addresses:
+                return response.Ok({"error": "You must login to the store Guest WiFi to use this service. Please login to \"UBIRserve WiFi\""})
+        # wifi_logins = UBIRWiFi.objects.filter(phone=phone_number_without_code)
+        # if not wifi_logins:
+        #    return response.Ok({"error": "You must login to the store Guest WiFi to use this service.  "
+        #                                 "Please login to \"UBIRserve WiFi\""})
+        phone_number_without_code = request.data['phone_number_without_code']
         try:
             customer = Customer.objects.get(phone=phone_number_without_code)
             if customer.is_in_store:
                 return response.Ok({"error": "This phone number is already logged in this company/store."})
-        except:
+        except Customer.DoesNotExist:
             pass
         try:
             store_table_status = StoreTableStatus.objects.get(store__store_id=store_id, table_seat=table_id)
             if store_table_status.status == StoreTableStatus.CLOSED:
                 return response.Ok({"error": "The table is closed now. Please ask the service person."})
-        except:
+        except StoreTableStatus.DoesNotExist:
             return response.Ok({"error": "This table is closed. "
                                          "Please tell a server or the manager you need a new table"})
         serializer = PhoneSerializer(data=request.data)
