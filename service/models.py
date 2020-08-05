@@ -12,8 +12,8 @@ class Serviceman(models.Model):
     approved = models.BooleanField(default=False)
 
     class Meta:
-        verbose_name = _('Serviceman')
-        verbose_name_plural = _('Servicemen')
+        verbose_name = _('Staff')
+        verbose_name_plural = _('Staffs')
 
     def __str__(self):
         return self.user.username
