@@ -37,6 +37,7 @@ class Common(Configuration):
         'service',
         'order',
         'chat',
+        'log',
         # Third party apps
         'rest_framework',  # utilities for rest apis
         'rest_framework.authtoken',
