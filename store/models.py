@@ -10,6 +10,7 @@ class Company(models.Model):
     company_id = models.IntegerField(verbose_name="Company Id", unique=True)
     name = models.CharField(max_length=25, blank=True, null=True, verbose_name="Company Name")
     description = models.TextField(null=True, blank=True, verbose_name="Company Overview")
+    specific_phone_number_prefix = models.CharField(max_length=25, blank=True, null=True, verbose_name="Specific Phone Number Prefix")
 
     class Meta:
         verbose_name = "Company"

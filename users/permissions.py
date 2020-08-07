@@ -2,6 +2,7 @@ from rest_framework.permissions import BasePermission, SAFE_METHODS
 from rest_framework.authtoken.models import Token
 
 from customer.models import UBIRWiFi, Customer
+from store.models import Company
 
 
 class IsUBIRLoggedIn(BasePermission):
@@ -9,6 +10,14 @@ class IsUBIRLoggedIn(BasePermission):
         try:
             phone_number_without_code = request.data['phone_number_without_code']
             if UBIRWiFi.objects.filter(phone=phone_number_without_code):
+                return True
+        except:
+            pass
+        try:
+            company_id = request.data['companyId']
+            company = Company.objects.get(company_id=company_id)
+            specific_phone_number_prefix = company.specific_phone_number_prefix
+            if specific_phone_number_prefix != "" and phone_number_without_code.startswith(specific_phone_number_prefix):
                 return True
         except:
             pass
