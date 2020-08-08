@@ -5,6 +5,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.core.exceptions import ObjectDoesNotExist
+from phone_verify.base import response
 
 from .models import Serviceman, ServicemanConfig
 from order.models import Order
@@ -13,6 +14,7 @@ from customer.models import Customer
 from chat.models import Message
 from .serializers import ServicemanSerializer
 from order.serializers import OrderSerializer
+from .utils import SMSTextSender
 from users.permissions import IsServiceman
 
 
@@ -39,7 +41,7 @@ class ServiceViewSet(ModelViewSet):
                 store_table_status = StoreTableStatus.objects.get(store=serviceman.store, table_seat=table_seat)
                 data['table_status'] = store_table_status.status  # Open
                 response_data.append(data)
-            return Response(response_data, status=status.HTTP_200_OK)
+            return Response({"store_config": response_data, "sms_text_guest_alert": store.sms_text_guest_alert}, status=status.HTTP_200_OK)
         except ObjectDoesNotExist:
             return Response({"message": "Internal Server Error"})
 
@@ -110,3 +112,17 @@ class ServiceViewSet(ModelViewSet):
             return Response(response_data, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"message": "Please verify your phone number."})
+
+    @action(detail=False, methods=['post'], permission_classes=[IsServiceman], url_path='send_sms_text')
+    def send_sms_text(self, request):
+        record_number = request.data['record_number']
+        message = request.data['message']
+        api_frontend_url = request.data['api_frontend_url']
+        try:
+            order = Order.objects.get(record_number=record_number)
+            to_phone_number = order.customer.phone
+            sms_text_sender = SMSTextSender()
+            sms_text_sender.send_message(order.store.store_id, order.table_id, message, api_frontend_url, to_phone_number)
+            return response.Ok({"message": "Success"})
+        except Order.DoesNotExist:
+            return response.Ok({"message": "Error"})
