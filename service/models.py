@@ -13,7 +13,7 @@ class Serviceman(models.Model):
 
     class Meta:
         verbose_name = _('Staff')
-        verbose_name_plural = _('Staffs')
+        verbose_name_plural = _('Staff')
 
     def __str__(self):
         return self.user.username
