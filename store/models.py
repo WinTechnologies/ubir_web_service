@@ -52,6 +52,7 @@ class Store(models.Model):
     logo = models.ImageField(upload_to="uploads/", blank=True, verbose_name="Store Logo Image")
     order_url = models.TextField(null=True, blank=True, verbose_name="Place New Order URL")
     sms_text_guest_alert = models.BooleanField(default=False, verbose_name="SMS Text Guest Alert")
+    screen_flash = models.BooleanField(default=False, verbose_name="Screen Flash")
     service_item = models.ManyToManyField(ServiceItem, blank=True, related_name="store_service_item")
     table_seat = models.ManyToManyField(TableSeat, blank=True, related_name="store_table_seat")
     ip_addresses = ArrayField(models.CharField(max_length=20), blank=True, null=True, verbose_name="IP Addresses")

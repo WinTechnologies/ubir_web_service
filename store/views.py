@@ -55,6 +55,7 @@ class StoreViewSet(ModelViewSet):
             response_data['timer_turn_red'] = store.timer_turn_red
             response_data['timer_escalation_to_manager'] = store.timer_escalation_to_manager
             response_data['table_id'] = customer.table_id
+            response_data['screen_flash'] = store.screen_flash
             return Response(response_data, status=status.HTTP_200_OK)
         except ObjectDoesNotExist:
             return Response({"message": "Please verify your phone number."})
