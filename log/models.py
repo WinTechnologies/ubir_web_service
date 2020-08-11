@@ -1,3 +1,4 @@
+from datetime import datetime
 from django.db import models
 from django.utils.encoding import python_2_unicode_compatible
 
@@ -17,7 +18,7 @@ class CustomerLog(models.Model):
         verbose_name_plural = "Customer Logs"
 
     def __str__(self):
-        return f"{self.company} - {self.store} - {self.login} - {self.tap} - {self.content}"
+        return f"{self.company} - {self.store} - {self.login} - {self.timestamp.strftime('%Y-%m-%d %H:%M:%S')} - {self.tap} - {self.content}"
 
 
 @python_2_unicode_compatible
@@ -35,4 +36,4 @@ class ServiceLog(models.Model):
         verbose_name_plural = "Service Logs"
 
     def __str__(self):
-        return f"{self.company} - {self.store} - {self.login} - {self.tap} - {self.content}"
+        return f"{self.company} - {self.store} - {self.login} - {self.timestamp.strftime('%Y-%m-%d %H:%M:%S')} - {self.tap} - {self.content}"
