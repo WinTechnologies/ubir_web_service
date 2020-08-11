@@ -11,11 +11,11 @@ class SMSTextSender():
         self.from_phone = os.getenv('FROM')
         self.client = Client(self.account_sid, self.auth_token)
 
-    def send_message(self, store_id, table_id, message, api_frontend_url, to_phone):
+    def send_message(self, company_name, table_id, message, api_frontend_url, to_phone):
         template = "sms_message_template.html"
         context = {
             "table_id": table_id,
-            "store_id": store_id,
+            "company_name": company_name,
             "message": message,
             "url": api_frontend_url + "/order",
         }
