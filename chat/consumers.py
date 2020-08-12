@@ -291,9 +291,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
             try:
                 response_data = {}
                 try:
-                    customer = Customer.objects.get(is_in_store=True, store_id=store_id, table_id=table_seat)
-                    customer.is_in_store = False
-                    customer.save()
+                    customers = Customer.objects.filter(is_in_store=True, store_id=store_id, table_id=table_seat)
+                    for customer in customers:
+                        customer.is_in_store = False
+                        customer.save()
                 except:
                     pass
                 orders = Order.objects.filter(store__store_id=store_id, table_id=table_seat)

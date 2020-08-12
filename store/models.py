@@ -51,6 +51,7 @@ class Store(models.Model):
     timer_escalation_to_manager = models.IntegerField(default=12, verbose_name="Escalation to manager (in mins)")
     logo = models.ImageField(upload_to="uploads/", blank=True, verbose_name="Store Logo Image")
     order_url = models.TextField(null=True, blank=True, verbose_name="Place New Order URL")
+    survey_url = models.CharField(max_length=255, blank=True, null=True, verbose_name="Survey URL")
     sms_text_guest_alert = models.BooleanField(default=False, verbose_name="SMS Text Guest Alert")
     screen_flash = models.BooleanField(default=False, verbose_name="Screen Flash")
     service_item = models.ManyToManyField(ServiceItem, blank=True, related_name="store_service_item")
