@@ -19,10 +19,13 @@ class CustomAuthToken(ObtainAuthToken):
             user = serializer.validated_data['user']
             token, created = Token.objects.get_or_create(user=user)
             serviceman = Serviceman.objects.get(user=user)
-            return Response({
-                'token': token.key,
-                'store_id': serviceman.store.store_id
-            })
+            if serviceman.active:
+                return Response({
+                    'token': token.key,
+                    'store_id': serviceman.store.store_id
+                })
+            else:
+                return Response({'error': 'You are not allowed to login'})
         except:
             return Response({'error': 'Invalid login request'})
 

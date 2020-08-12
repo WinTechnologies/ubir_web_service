@@ -9,7 +9,7 @@ from store.models import Store
 class Serviceman(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True)
     store = models.ForeignKey(Store, on_delete=models.CASCADE)
-    approved = models.BooleanField(default=False)
+    active = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = _('Staff')
