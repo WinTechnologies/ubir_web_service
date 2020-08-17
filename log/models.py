@@ -28,7 +28,7 @@ class ServiceLog(models.Model):
     store = models.CharField(max_length=25, blank=True, null=True, verbose_name="Store Name")
     login = models.CharField(max_length=25, blank=True, null=True, verbose_name="Staff Username")
     tap = models.CharField(max_length=25, blank=True, null=True, verbose_name="Tap")
-    content = models.CharField(max_length=100, blank=True, null=True, verbose_name="Content")
+    content = models.CharField(max_length=500, blank=True, null=True, verbose_name="Content")
     timestamp = models.DateTimeField(auto_now_add=True)
 
     class Meta:
