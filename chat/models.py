@@ -17,6 +17,7 @@ class Message(models.Model):
     store_id = models.CharField(max_length=25, null=True, blank=True, verbose_name="Store ID")
     type = models.CharField(choices=CHOICES, max_length=25, null=True, blank=True)
     table_id = models.CharField(max_length=25, null=True, blank=True, verbose_name="Table Seat Number")
+    phone = models.CharField(max_length=15, null=True, blank=True)
     item_title = models.CharField(max_length=150, null=True, blank=True)
     message = models.TextField(null=True, blank=True)
     is_seen = models.BooleanField(default=False)

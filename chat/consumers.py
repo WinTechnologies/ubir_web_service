@@ -120,7 +120,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             order.save()
             data = OrderSerializer(instance=order).data
             item_title = order.service_item.title
-            messages = Message.objects.filter(table_id=table_seat, store_id=store_id, item_title=item_title)
+            messages = Message.objects.filter(table_id=table_seat, store_id=store_id, item_title=item_title, phone=order.customer.phone)
             for message in messages:
                 message.is_seen = True
                 message.save()
@@ -155,12 +155,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
                                                              item_title=item_title,
                                                              type=Message.QUESTION,
                                                              message=message_text,
+                                                             phone=order.customer.phone,
                                                              is_seen=False)
             message.save()
             service_log = ServiceLog(company=store.company.name, store=store.name, login=serviceman.user.username,
                                      tap="Message", content=f"{table_seat}|{order.quantity}|{convert(timer)}|{message_text}")
             service_log.save()
             data = MessageSerializer(instance=message).data
+            data['order_number'] = record_number
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
@@ -181,6 +183,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                                                              item_title=item_title,
                                                              type=Message.ANSWER,
                                                              message=message_text,
+                                                             phone=phone_number,
                                                              is_seen=False)
             message.save()
             data = MessageSerializer(instance=message).data
@@ -189,6 +192,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             customer_log = CustomerLog(company=store.company.name, store=store.name, login=phone_number,
                                        tap="Message", content=f"{table_seat}|{order.record_number}|{order.service_item.title}|{order.quantity}|{convert(timer)}|{message_text}")
             customer_log.save()
+            data['order_number'] = order.record_number
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
@@ -199,6 +203,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         elif data['command'] == 'fetch_table_messages':
             store_id = data['store_id']
             table_id = data['table_id']
+            phone_number = data['phone_number']
             store = Store.objects.get(store_id=store_id)
             response_data = []
             for service_item in store.service_item.all():
@@ -206,14 +211,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 item['item_title'] = service_item.title
                 item['question'] = ''
                 item['answer'] = ''
-                question = Message.objects.filter(store_id=store_id, table_id=table_id, item_title=service_item.title, type=Message.QUESTION, is_seen=False).order_by('-created_at').first()
+                question = Message.objects.filter(store_id=store_id, table_id=table_id, phone=phone_number, item_title=service_item.title, type=Message.QUESTION, is_seen=False).order_by('-created_at').first()
                 if question:
                     item['question'] = question.message
-                answer = Message.objects.filter(store_id=store_id, table_id=table_id, item_title=service_item.title, type=Message.ANSWER, is_seen=False).order_by('-created_at').first()
+                answer = Message.objects.filter(store_id=store_id, table_id=table_id, phone=phone_number, item_title=service_item.title, type=Message.ANSWER, is_seen=False).order_by('-created_at').first()
                 if answer:
                     item['answer'] = answer.message
                 item['table_id'] = table_id
                 item['store_id'] = store_id
+                item['phone_number'] = phone_number
                 response_data.append(item)
 
             await self.channel_layer.group_send(
@@ -236,23 +242,31 @@ class ChatConsumer(AsyncWebsocketConsumer):
             response_data = []
             for table_id in table_ids:
                 for service_item in store.service_item.all():
-                    item = {}
-                    item['table_id'] = table_id
-                    item['item_title'] = service_item.title
-                    item['question'] = ''
-                    item['answer'] = ''
-                    question = Message.objects.filter(store_id=store_id, table_id=table_id,
-                                                      item_title=service_item.title,
-                                                      type=Message.QUESTION,
-                                                      is_seen=False).order_by('-created_at').first()
-                    if question:
-                        item['question'] = question.message
-                    answer = Message.objects.filter(store_id=store_id, table_id=table_id,
-                                                    item_title=service_item.title, type=Message.ANSWER, is_seen=False).order_by(
-                        '-created_at').first()
-                    if answer:
-                        item['answer'] = answer.message
-                    response_data.append(item)
+                    for customer in Customer.objects.filter(store_id=store_id, table_id=table_id, is_in_store=True):
+                        item = {}
+                        item['table_id'] = table_id
+                        item['item_title'] = service_item.title
+                        item['question'] = ''
+                        item['answer'] = ''
+                        question = Message.objects.filter(store_id=store_id, table_id=table_id,
+                                                          item_title=service_item.title,
+                                                          type=Message.QUESTION,
+                                                          phone=customer.phone,
+                                                          is_seen=False).order_by('-created_at').first()
+                        if question:
+                            item['question'] = question.message
+                        answer = Message.objects.filter(store_id=store_id, table_id=table_id,
+                                                        item_title=service_item.title, type=Message.ANSWER, phone=customer.phone, is_seen=False).order_by(
+                            '-created_at').first()
+                        if answer:
+                            item['answer'] = answer.message
+                        try:
+                            order = Order.objects.filter(customer=customer, store=store, table_id=table_id, service_item=service_item).exclude(status=Order.COMPLETED).first()
+                            record_number = order.record_number
+                        except:
+                            record_number = ''
+                        item['record_number'] = record_number
+                        response_data.append(item)
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
@@ -298,14 +312,16 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 except:
                     pass
                 orders = Order.objects.filter(store__store_id=store_id, table_id=table_seat)
+                phone_numbers = []
                 for order in orders:
                     order.status = Order.COMPLETED
                     order.save()
+                    phone_numbers.append(order.customer.phone)
                 messages = Message.objects.filter(store_id=store_id, table_id=table_seat, is_seen=False)
                 for message in messages:
                     message.is_seen = True
                     message.save()
-                response_data = {"message": "success", "store_id": store_id, "table_id": table_seat}
+                response_data = {"message": "success", "store_id": store_id, "table_id": table_seat, "phone_numbers": phone_numbers}
             except:
                 response_data = {}
             await self.channel_layer.group_send(
@@ -341,7 +357,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         message = data['message']
         # Send message to WebSocket
         await self.send(text_data=json.dumps({
-            'message': MessageSerializer(instance=message).data,
+            'message': message,
             'command': 'message_from_service'
         }))
 
@@ -351,7 +367,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         # Send message to WebSocket
         await self.send(text_data=json.dumps({
-            'message': MessageSerializer(instance=message).data,
+            'message': message,
             'command': 'message_from_table'
         }))
 
