@@ -122,7 +122,7 @@ class ServiceViewSet(ModelViewSet):
             order = Order.objects.get(record_number=record_number)
             to_phone_number = order.customer.phone
             sms_text_sender = SMSTextSender()
-            sms_text_sender.send_message(order.store.company.name, order.table_id, message, api_frontend_url, to_phone_number)
+            sms_text_sender.send_message(order.store.name, order.table_id, message, api_frontend_url, to_phone_number)
             return response.Ok({"message": "Success"})
         except Order.DoesNotExist:
             return response.Ok({"message": "Error"})
