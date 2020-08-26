@@ -31,6 +31,17 @@ class ServiceItem(models.Model):
         return self.title
 
 
+class DiningType(models.Model):
+    title = models.CharField(max_length=150, unique=True)
+
+    class Meta:
+        verbose_name = "Dining Type"
+        verbose_name_plural = "Dining Types"
+
+    def __str__(self):
+        return self.title
+
+
 class TableSeat(models.Model):
     table_seat = models.CharField(max_length=10, unique=True)
 
@@ -56,7 +67,9 @@ class Store(models.Model):
     screen_flash = models.BooleanField(default=False, verbose_name="Screen Flash")
     service_item = models.ManyToManyField(ServiceItem, blank=True, related_name="store_service_item")
     table_seat = models.ManyToManyField(TableSeat, blank=True, related_name="store_table_seat")
+    dining_type = models.ManyToManyField(DiningType, blank=True, related_name="store_dining_type")
     ip_addresses = ArrayField(models.CharField(max_length=20), blank=True, null=True, verbose_name="IP Addresses")
+    order_rank = models.IntegerField(null=True, blank=True, verbose_name="Order Rank# (0 indicates that 'Place a New Order' button is shown at all times)")
 
     class Meta:
         verbose_name = "Store"

@@ -3,6 +3,8 @@ from django.utils.encoding import python_2_unicode_compatible
 from django.utils.translation import gettext_lazy as _
 from datetime import datetime
 
+from store.models import DiningType
+
 
 @python_2_unicode_compatible
 class Customer(models.Model):
@@ -15,7 +17,13 @@ class Customer(models.Model):
     start_time = models.DateTimeField(default=datetime.now)
     end_time = models.DateTimeField(null=True, blank=True)
     is_in_store = models.BooleanField(default=False, verbose_name="True if a customer is already logged in, False if not")
+    first_name = models.CharField(max_length=25, null=True, blank=True)
+    last_name = models.CharField(max_length=25, null=True, blank=True)
+    number_in_party = models.IntegerField(null=True, blank=True)
+    dining_type = models.ForeignKey(DiningType, blank=True, null=True, on_delete=models.CASCADE)
 
+    def full_name(self):
+        return f"{self.first_name} {self.last_name}"
     def __str__(self):
         return f"{self.record_number} <-> {self.phone}"
 

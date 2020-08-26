@@ -1,7 +1,7 @@
 from django import forms
 from django.contrib import admin
 from django_better_admin_arrayfield.admin.mixins import DynamicArrayMixin
-from .models import ServiceItem, TableSeat, Store, Company, StoreTableStatus
+from .models import ServiceItem, TableSeat, Store, DiningType, Company, StoreTableStatus
 
 
 class ServiceItemAdmin(admin.ModelAdmin):
@@ -9,6 +9,10 @@ class ServiceItemAdmin(admin.ModelAdmin):
 
 
 class TableSeatAdmin(admin.ModelAdmin):
+    pass
+
+
+class DiningTypeAdmin(admin.ModelAdmin):
     pass
 
 
@@ -20,12 +24,17 @@ class TableSeatMembershipInline(admin.TabularInline):
     model = Store.table_seat.through
 
 
+class DiningTypeMembershipInline(admin.TabularInline):
+    model = Store.dining_type.through
+
+
 class StoreAdmin(admin.ModelAdmin, DynamicArrayMixin):
     inlines = [
         ServiceItemMembershipInline,
-        TableSeatMembershipInline
+        TableSeatMembershipInline,
+        DiningTypeMembershipInline
     ]
-    exclude = ('service_item', 'table_seat', )
+    exclude = ('service_item', 'table_seat', 'dining_type', )
 
     def save_model(self, request, obj, form, change):
         """
@@ -60,6 +69,7 @@ class CompanyAdmin(admin.ModelAdmin):
 
 
 admin.site.register(ServiceItem, ServiceItemAdmin)
-admin.site.register(TableSeat, TableSeatAdmin)
+admin.site.register(TableSeat, TableSeatAdmin),
+admin.site.register(DiningType, DiningTypeAdmin)
 admin.site.register(Store, StoreAdmin)
 admin.site.register(Company, CompanyAdmin)

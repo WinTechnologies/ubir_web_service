@@ -1,5 +1,6 @@
 import os
 import base64
+from datetime import datetime, timezone
 from rest_framework import status
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.response import Response
@@ -13,7 +14,7 @@ from phone_verify.services import send_security_code_and_generate_session_token
 from phone_verify.base import response
 
 from .models import Customer, UBIRWiFi
-from store.models import StoreTableStatus, Store, Company
+from store.models import StoreTableStatus, Store, Company, DiningType
 from .serializers import CustomerSerializer, UBIRWiFiSerializer
 from users.permissions import IsUBIRLoggedIn, IsServiceman
 
@@ -134,6 +135,20 @@ class CustomVerificationViewSet(VerificationViewSet):
         detail=False,
         methods=["POST"],
         permission_classes=[AllowAny],
+        serializer_class=PhoneSerializer,
+    )
+    def wait_list_register(self, request):
+        serializer = PhoneSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        session_token = send_security_code_and_generate_session_token(
+            str(serializer.validated_data["phone_number"])
+        )
+        return response.Ok({"session_token": session_token, "is_authenticated": False})
+
+    @action(
+        detail=False,
+        methods=["POST"],
+        permission_classes=[AllowAny],
         serializer_class=SMSVerificationSerializer,
     )
     def verify(self, request):
@@ -152,5 +167,40 @@ class CustomVerificationViewSet(VerificationViewSet):
         customer.table_id = table_id
         customer.is_in_store = True
         customer.session_token = request.data['session_token']
+        customer.save()
+        return response.Ok({"message": "Security code is valid."})
+
+    @action(
+        detail=False,
+        methods=["POST"],
+        permission_classes=[AllowAny],
+        serializer_class=SMSVerificationSerializer,
+    )
+    def wait_list_verify(self, request):
+        company_id = request.data.pop('companyId')
+        store_id = request.data.pop('storeId')
+        table_id = request.data.pop('tableId')
+        first_name = request.data['first_name']
+        last_name = request.data['last_name']
+        number_in_party = request.data['number_in_party']
+        selected_dining_type = request.data['selected_dining_type']
+        serializer = SMSVerificationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        phone_number_without_code = request.data['phone_number_without_code']
+        try:
+            customer = Customer.objects.get(phone=phone_number_without_code)
+        except:
+            customer = Customer(phone=phone_number_without_code)
+        customer.company_id = company_id
+        customer.store_id = store_id
+        customer.table_id = table_id
+        customer.first_name = first_name
+        customer.last_name = last_name
+        customer.number_in_party = number_in_party
+        dining_type = DiningType.objects.get(title=selected_dining_type)
+        customer.dining_type = dining_type
+        customer.is_in_store = True
+        customer.session_token = request.data['session_token']
+        customer.start_time = datetime.now(timezone.utc)
         customer.save()
         return response.Ok({"message": "Security code is valid."})

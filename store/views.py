@@ -57,6 +57,7 @@ class StoreViewSet(ModelViewSet):
             response_data['table_id'] = customer.table_id
             response_data['screen_flash'] = store.screen_flash
             response_data['survey_url'] = store.survey_url
+            response_data['order_rank'] = store.order_rank
             return Response(response_data, status=status.HTTP_200_OK)
         except ObjectDoesNotExist:
             return Response({"message": "Please verify your phone number."})
@@ -98,3 +99,42 @@ class StoreViewSet(ModelViewSet):
         if not store.table_seat.filter(table_seat=table_id).exists():
             return Response({"error": "The table id is invalid."})
         return Response({"error": ""}, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny], url_path='get_dining_types')
+    def get_dining_types(self, request):
+        company_id = request.data['companyId']
+        store_id = request.data['storeId']
+        response_data = []
+        try:
+            store = Store.objects.get(store_id=store_id)
+        except Store.DoesNotExist:
+            return Response({"error": "Store does not exist."}, status=status.HTTP_404_NOT_FOUND)
+        for dining_type in store.dining_type.all():
+            response_data.append({"title": dining_type.title, "id": dining_type.id})
+        return Response(response_data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['post'], permission_classes=[IsOnTable], url_path='get_company_information')
+    def get_company_information(self, request):
+        company_id = request.data['companyId']
+        try:
+            company = Company.objects.get(company_id=company_id)
+        except Company.DoesNotExist:
+            return Response({"error": "Company does not exist."}, status=status.HTTP_404_NOT_FOUND)
+        return Response({"company_name": company.name}, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['post'], permission_classes=[IsOnTable], url_path='get_customer_information')
+    def get_customer_information(self, request):
+        phone_number = request.data['phone_number']
+        try:
+            customer = Customer.objects.get(phone=phone_number)
+        except Customer.DoesNotExist:
+            return Response({"error": "Customer does not exists."}, status=status.HTTP_404_NOT_FOUND)
+        response = {
+            "full_name": customer.full_name(),
+            "number_in_party": customer.number_in_party,
+            "dining_type": customer.dining_type.title,
+            "longest_wait": "12:12",
+            "average_wait": "10:10",
+            "phone_number": phone_number
+        }
+        return Response(response, status=status.HTTP_200_OK)
