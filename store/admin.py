@@ -57,6 +57,14 @@ class StoreAdmin(admin.ModelAdmin, DynamicArrayMixin):
                             store_table_status = StoreTableStatus(store=obj, table_seat=table_seat, status=StoreTableStatus.OPEN)
                             store_table_status.save()
 
+    def save_related(self, request, form, formsets, change):
+        super(StoreAdmin, self).save_related(request, form, formsets, change)
+        obj = form.instance
+        for table_seat in obj.table_seat.all():
+            if not obj.store_id + '.' in table_seat.table_id:
+                obj.table_seat.remove(table_seat)
+        obj.save()
+
     def save_formset(self, request, form, formset, change):
         """
         Given an inline formset save it to the database.

@@ -43,14 +43,28 @@ class DiningType(models.Model):
 
 
 class TableSeat(models.Model):
-    table_seat = models.CharField(max_length=10, unique=True)
+    table_id = models.CharField(max_length=25, verbose_name="Unique Table ID(Format: {Store#}.{Table/Seat} (for example, 1.1.1 or 1.1.B1))", null=True, blank=True)
+    table_seat = models.CharField(max_length=10, verbose_name="Pure Table/Seat Name(For example, 1 or B1)", null=True, blank=True)
 
     class Meta:
         verbose_name = "Table/Seat"
         verbose_name_plural = "Tables/Seats"
 
     def __str__(self):
-        return self.table_seat
+        if self.table_id:
+            return self.table_id
+        else:
+            return self.table_seat
+
+    def clean(self):
+        validation = False
+        for store in Store.objects.all():
+            if store.store_id + '.' in self.table_id:
+                validation = True
+        if not validation:
+            raise ValidationError({"table_id": "It must contain the store #. (for example. store#.table/seat name)"})
+        if self.table_id.split('.')[-1] != self.table_seat:
+            raise ValidationError({"table_seat": "It does not match with the table_id"})
 
 
 class Store(models.Model):
@@ -105,9 +119,10 @@ class Store(models.Model):
         if not self.store_id.startswith("{}.".format(self.company.company_id)):
             raise ValidationError({"store_id": "Store ID should start with '{Company ID}.'"})
         ip_address_valid = True
-        for ip_address in self.ip_addresses:
-            if not self.validateIP(ip_address):
-                ip_address_valid = False
+        if self.ip_addresses:
+            for ip_address in self.ip_addresses:
+                if not self.validateIP(ip_address):
+                    ip_address_valid = False
         if not ip_address_valid:
             raise ValidationError({"ip_addresses": "IP Address is in invalid format."})
 
