@@ -135,6 +135,7 @@ class StoreViewSet(ModelViewSet):
             "dining_type": customer.dining_type.title,
             "longest_wait": "12:12",
             "average_wait": "10:10",
+            "actual_wait": int((datetime.now(timezone.utc) - customer.start_time).total_seconds()),
             "phone_number": phone_number
         }
         return Response(response, status=status.HTTP_200_OK)
