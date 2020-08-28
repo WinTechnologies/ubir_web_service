@@ -28,7 +28,7 @@ class OrderViewSet(ModelViewSet):
             customer = Customer.objects.get(phone=phone_number)
             store = Store.objects.get(store_id=store_id)
             service_item = ServiceItem.objects.get(pk=service_item_id)
-            order, created = Order.objects.get_or_create(customer=customer, store=store, service_item=service_item)
+            order, created = Order.objects.get_or_create(customer=customer, store=store, service_item=service_item, session_token=customer.session_token)
             order.quantity = quantity
             order.table_id = table_id
             order.start_time = datetime.now(timezone.utc)

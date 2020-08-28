@@ -38,7 +38,7 @@ class ServiceViewSet(ModelViewSet):
                 except:
                     data['table_filter'] = False # Not Selected
                 data['reset_table'] = 'Reset'
-                store_table_status = StoreTableStatus.objects.get(store=serviceman.store, table_seat=table_seat)
+                store_table_status = StoreTableStatus.objects.get(store=serviceman.store, table_seat=table_seat.table_seat)
                 data['table_status'] = store_table_status.status  # Open
                 response_data.append(data)
             return Response({"store_config": response_data, "sms_text_guest_alert": store.sms_text_guest_alert}, status=status.HTTP_200_OK)

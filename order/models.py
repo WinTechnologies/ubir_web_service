@@ -30,6 +30,7 @@ class Order(models.Model):
     start_time = models.DateTimeField(default=datetime.now)
     end_time = models.DateTimeField(null=True, blank=True)
     status = models.CharField(choices=CHOICES, default=PENDING, max_length=25)
+    session_token = models.CharField(max_length=512, null=True, blank=True)
 
     def __str__(self):
         return f"Store {self.store.store_id} - Table {self.table_id} - {self.service_item.title} - {self.status}"

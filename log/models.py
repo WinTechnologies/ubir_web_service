@@ -12,6 +12,7 @@ class CustomerLog(models.Model):
     tap = models.CharField(max_length=25, blank=True, null=True, verbose_name="Tap")
     content = models.CharField(max_length=500, blank=True, null=True, verbose_name="Content")
     timestamp = models.DateTimeField(auto_now_add=True)
+    session_token = models.CharField(max_length=512, null=True, blank=True)
 
     class Meta:
         verbose_name = "Customer Log"
@@ -30,6 +31,7 @@ class ServiceLog(models.Model):
     tap = models.CharField(max_length=25, blank=True, null=True, verbose_name="Tap")
     content = models.CharField(max_length=500, blank=True, null=True, verbose_name="Content")
     timestamp = models.DateTimeField(auto_now_add=True)
+    session_token = models.CharField(max_length=512, null=True, blank=True)
 
     class Meta:
         verbose_name = "Service Log"

@@ -1,5 +1,8 @@
 import os
 import base64
+import random
+import string
+
 from datetime import datetime, timezone
 from rest_framework import status
 from rest_framework.viewsets import ModelViewSet
@@ -120,9 +123,10 @@ class CustomVerificationViewSet(VerificationViewSet):
             customer.store_id = store_id
             customer.table_id = table_id
             customer.is_in_store = True
-            customer.session_token = "session_token"
+            session_token = "".join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(25))
+            customer.session_token = session_token
             customer.save()
-            return response.Ok({"session_token": "session_token", "is_authenticated": True})
+            return response.Ok({"session_token": session_token, "is_authenticated": True})
         else:
             serializer = PhoneSerializer(data=request.data)
             serializer.is_valid(raise_exception=True)

@@ -52,6 +52,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             table_id = data['table_id']
             service_item_id = data['service_item_id']
             phone_number = data['phone_number']
+            session_token = data['session_token']
             customer = Customer.objects.get(phone=phone_number, is_in_store=True)
             store = Store.objects.get(store_id=store_id)
             service_item = ServiceItem.objects.get(pk=service_item_id)
@@ -63,9 +64,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
             except:
                 pass
             if not order:
-                order, created = Order.objects.get_or_create(customer=customer, store=store, service_item=service_item, status=Order.PENDING)
+                order, created = Order.objects.get_or_create(customer=customer, store=store, service_item=service_item, status=Order.PENDING, session_token=customer.session_token)
             customer_log = CustomerLog(company=store.company.name, store=store.name, login=phone_number,
-                                       tap="Item", content=f"{table_id}|{order.record_number}|{order.service_item.title}")
+                                       tap="Item", content=f"{table_id}|{order.record_number}|{order.service_item.title}",
+                                       session_token=customer.session_token)
             customer_log.save()
             order.quantity = order.quantity + 1
             order.table_id = table_id
@@ -99,7 +101,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
             data = OrderSerializer(instance=order).data
             data['timer'] = int((datetime.now(timezone.utc) - order.start_time).total_seconds())
             service_log = ServiceLog(company=store.company.name, store=store.name, login=serviceman.user.username,
-                                     tap="Item", content=f"{table_seat}|{order.quantity}|{convert(data['timer'])}")
+                                     tap="Item", content=f"{table_seat}|{order.quantity}|{convert(data['timer'])}",
+                                     session_token=order.customer.session_token)
             service_log.save()
             await self.channel_layer.group_send(
                 self.room_group_name,
@@ -129,7 +132,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
             serviceman = Serviceman.objects.get(user=token.user)
             timer = int((datetime.now(timezone.utc) - order.start_time).total_seconds())
             service_log = ServiceLog(company=store.company.name, store=store.name, login=serviceman.user.username,
-                                     tap="Timer", content=f"{table_seat}|{quantity}|{convert(timer)}")
+                                     tap="Timer", content=f"{table_seat}|{quantity}|{convert(timer)}",
+                                     session_token=order.customer.session_token)
             service_log.save()
             await self.channel_layer.group_send(
                 self.room_group_name,
@@ -156,10 +160,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
                                                              type=Message.QUESTION,
                                                              message=message_text,
                                                              phone=order.customer.phone,
+                                                             session_token=order.customer.session_token,
                                                              is_seen=False)
             message.save()
             service_log = ServiceLog(company=store.company.name, store=store.name, login=serviceman.user.username,
-                                     tap="Message", content=f"{table_seat}|{order.quantity}|{convert(timer)}|{message_text}")
+                                     tap="Message", content=f"{table_seat}|{order.quantity}|{convert(timer)}|{message_text}",
+                                     session_token=order.customer.session_token)
             service_log.save()
             data = MessageSerializer(instance=message).data
             data['order_number'] = record_number
@@ -176,6 +182,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             item_title = data['item_title']
             message_text = data['message']
             phone_number = data['phone_number']
+            session_token = data['session_token']
             customer = Customer.objects.get(phone=phone_number, is_in_store=True)
             store = Store.objects.get(store_id=store_id)
             message, created = Message.objects.get_or_create(table_id=table_seat,
@@ -184,13 +191,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
                                                              type=Message.ANSWER,
                                                              message=message_text,
                                                              phone=phone_number,
+                                                             session_token=customer.session_token,
                                                              is_seen=False)
             message.save()
             data = MessageSerializer(instance=message).data
             order = Order.objects.get(Q(customer=customer) & Q(store=store) & Q(service_item__title=item_title) & Q(table_id=table_seat) & ~Q(status=Order.COMPLETED))
             timer = int((datetime.now(timezone.utc) - order.start_time).total_seconds())
             customer_log = CustomerLog(company=store.company.name, store=store.name, login=phone_number,
-                                       tap="Message", content=f"{table_seat}|{order.record_number}|{order.service_item.title}|{order.quantity}|{convert(timer)}|{message_text}")
+                                       tap="Message", content=f"{table_seat}|{order.record_number}|{order.service_item.title}|{order.quantity}|{convert(timer)}|{message_text}",
+                                       session_token=session_token)
             customer_log.save()
             data['order_number'] = order.record_number
             await self.channel_layer.group_send(
