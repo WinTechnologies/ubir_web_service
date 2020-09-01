@@ -101,7 +101,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             data = OrderSerializer(instance=order).data
             data['timer'] = int((datetime.now(timezone.utc) - order.start_time).total_seconds())
             service_log = ServiceLog(company=store.company.name, store=store.name, login=serviceman.user.username,
-                                     tap="Item", content=f"{table_seat}|{order.quantity}|{convert(data['timer'])}",
+                                     tap="Item", content=f"{table_seat}|{order.quantity}|{convert(data['timer'])}|{order.service_item.title}",
                                      session_token=order.customer.session_token)
             service_log.save()
             await self.channel_layer.group_send(
@@ -132,7 +132,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             serviceman = Serviceman.objects.get(user=token.user)
             timer = int((datetime.now(timezone.utc) - order.start_time).total_seconds())
             service_log = ServiceLog(company=store.company.name, store=store.name, login=serviceman.user.username,
-                                     tap="Timer", content=f"{table_seat}|{quantity}|{convert(timer)}",
+                                     tap="Timer", content=f"{table_seat}|{quantity}|{convert(timer)}|{order.service_item.title}",
                                      session_token=order.customer.session_token)
             service_log.save()
             await self.channel_layer.group_send(
@@ -164,7 +164,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                                                              is_seen=False)
             message.save()
             service_log = ServiceLog(company=store.company.name, store=store.name, login=serviceman.user.username,
-                                     tap="Message", content=f"{table_seat}|{order.quantity}|{convert(timer)}|{message_text}",
+                                     tap="Message", content=f"{table_seat}|{order.quantity}|{convert(timer)}|{message_text}|{item_title}",
                                      session_token=order.customer.session_token)
             service_log.save()
             data = MessageSerializer(instance=message).data
