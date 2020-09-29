@@ -1,3 +1,4 @@
+from datetime import datetime
 from django.db import models
 from django.db.models.signals import post_save
 from django_better_admin_arrayfield.models.fields import ArrayField
@@ -33,6 +34,7 @@ class ServiceItem(models.Model):
 
 class DiningType(models.Model):
     title = models.CharField(max_length=150, unique=True)
+    action_type = models.CharField(max_length=50, null=True, blank=True, verbose_name="Action Type")
 
     class Meta:
         verbose_name = "Dining Type"
@@ -43,8 +45,39 @@ class DiningType(models.Model):
 
 
 class TableSeat(models.Model):
-    table_id = models.CharField(max_length=25, verbose_name="Unique Table ID(Format: {Store#}.{Table/Seat} (for example, 1.1.1 or 1.1.B1))", null=True, blank=True)
-    table_seat = models.CharField(max_length=10, verbose_name="Pure Table/Seat Name(For example, 1 or B1)", null=True, blank=True)
+    AVAILABLE = "Available"
+    OCCUPIED = "Occupied"
+    CLEANING = "Cleaning"
+    ACTION_STATUS_CHOICES = (
+        (AVAILABLE, AVAILABLE),
+        (OCCUPIED, OCCUPIED),
+        (CLEANING, CLEANING),
+    )
+    ACTION_STATUS_CHOICES_DICT = dict(ACTION_STATUS_CHOICES)
+    OPEN = "Open"
+    CLOSED = "Closed"
+    STATUS_CHOICES = (
+        (OPEN, OPEN),
+        (CLOSED, CLOSED),
+    )
+    STATUS_CHOICES_DICT = dict(STATUS_CHOICES)
+    table_id = models.CharField(max_length=25,
+                                verbose_name="Unique Table ID(Format: {Store#}.{Table/Seat} (for example, 1.1.1 or 1.1.B1))",
+                                null=True, blank=True)
+    table_seat = models.CharField(max_length=10, verbose_name="Pure Table/Seat Name(For example, 1 or B1)", null=True,
+                                  blank=True)
+    action_status = models.CharField(choices=ACTION_STATUS_CHOICES, default=AVAILABLE, max_length=25)
+    status = models.CharField(choices=STATUS_CHOICES, default=OPEN, max_length=25)
+    location = models.ForeignKey(DiningType, on_delete=models.CASCADE, null=True, blank=True)
+    seats = models.IntegerField(default=1, verbose_name="Number of Seats")
+    last_time_status_changed = models.DateTimeField(default=datetime.now, verbose_name="Last time table status changed",
+                                                    null=True, blank=True)
+    seated_time = models.DateTimeField(default=datetime.now, verbose_name="Actual time table is seated", null=True,
+                                       blank=True)
+    ordered_time = models.DateTimeField(default=datetime.now, verbose_name="Actual time order is received", null=True,
+                                        blank=True)
+    last_time_customer_tap = models.DateTimeField(default=datetime.now, verbose_name="Last time customer tapped",
+                                                  null=True, blank=True)
 
     class Meta:
         verbose_name = "Table/Seat"
@@ -84,6 +117,10 @@ class Store(models.Model):
     dining_type = models.ManyToManyField(DiningType, blank=True, related_name="store_dining_type")
     ip_addresses = ArrayField(models.CharField(max_length=20), blank=True, null=True, verbose_name="IP Addresses")
     order_rank = models.IntegerField(null=True, blank=True, verbose_name="Order Rank# (0 indicates that 'Place a New Order' button is shown at all times)")
+    wait_time_frame = models.IntegerField(default=10, verbose_name="Wait Time Frame for getting longest/average wait time")
+    pickup_message = models.CharField(max_length=100, default='', verbose_name="Message for 'Pickup & Bar' type")
+    curside_message = models.CharField(max_length=100, default='',
+                                       verbose_name="Message for 'Delivering to Car/Curbside' type")
 
     class Meta:
         verbose_name = "Store"
@@ -125,34 +162,3 @@ class Store(models.Model):
                     ip_address_valid = False
         if not ip_address_valid:
             raise ValidationError({"ip_addresses": "IP Address is in invalid format."})
-
-
-class StoreTableStatus(models.Model):
-    OPEN = "Open"
-    CLOSED = "Closed"
-    CHOICES = (
-        (OPEN, OPEN),
-        (CLOSED, CLOSED),
-    )
-    CHOICES_DICT = dict(CHOICES)
-    store = models.ForeignKey(Store, on_delete=models.CASCADE)
-    table_seat = models.CharField(max_length=10)
-    status = models.CharField(choices=CHOICES, default=OPEN, max_length=25)
-
-    class Meta:
-        verbose_name = "Table/Seat"
-        verbose_name_plural = "Tables/Seats"
-
-    def __str__(self):
-        return self.table_seat
-
-
-# @receiver(post_save, sender=Store)
-# def create_store(sender, instance, created, **kwargs):
-#     table_seats = instance.table_seat.all()
-#     for table_seat in table_seats:
-#         try:
-#             StoreTableStatus.objects.get(store=instance, table_seat=table_seat.table_seat)
-#         except:
-#             store_table_status = StoreTableStatus(store=instance, table_seat=table_seat.table_seat, status=StoreTableStatus.OPEN)
-#             store_table_status.save()

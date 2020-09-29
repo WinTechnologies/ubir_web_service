@@ -12,6 +12,7 @@ from store.urls import router as store_router
 from order.urls import router as order_router
 from service.urls import router as service_router
 from log.urls import router as log_router
+from host.urls import router as host_router
 
 router = DefaultRouter()
 router.registry.extend(customer_router.registry)
@@ -19,6 +20,7 @@ router.registry.extend(store_router.registry)
 router.registry.extend(order_router.registry)
 router.registry.extend(service_router.registry)
 router.registry.extend(log_router.registry)
+router.registry.extend(host_router.registry)
 router.register('phone', CustomVerificationViewSet, basename='phone')
 
 urlpatterns = [

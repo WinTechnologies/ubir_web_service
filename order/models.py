@@ -22,7 +22,7 @@ class Order(models.Model):
     CHOICES_DICT = dict(CHOICES)
 
     record_number = models.AutoField(primary_key=True)
-    customer = models.ForeignKey(Customer, on_delete=models.CASCADE)
+    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, null=True, blank=True)
     store = models.ForeignKey(Store, on_delete=models.CASCADE)
     table_id = models.CharField(max_length=25, null=True, blank=True)
     service_item = models.ForeignKey(ServiceItem, on_delete=models.CASCADE)

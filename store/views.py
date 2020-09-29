@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta
 from rest_framework.viewsets import ModelViewSet
 from rest_framework import status
 from rest_framework.response import Response
@@ -8,9 +8,10 @@ from django.core.exceptions import ObjectDoesNotExist
 
 from customer.models import Customer
 from order.models import Order
+from chat.models import Message
 from .models import Store, Company
 from .serializers import StoreSerializer, ServiceItemSerializer
-from users.permissions import IsOnTable, IsUBIRLoggedIn, IsServiceman
+from users.permissions import IsOnTable, IsUBIRLoggedIn
 
 
 class StoreViewSet(ModelViewSet):
@@ -40,14 +41,17 @@ class StoreViewSet(ModelViewSet):
                     order = Order.objects.filter(customer=customer, store=store, service_item=service_item, table_id=table_id).exclude(status=Order.COMPLETED).first()
                     data['quantity'] = order.quantity
                     data['status'] = order.status
-                    data['timer'] = int((datetime.now(timezone.utc) - order.start_time).total_seconds())
+                    data['timer'] = int((datetime.now() - order.start_time).total_seconds())
                 except:
                     data['quantity'] = 0
                     data['timer'] = 0
                     data['status'] = Order.PENDING
                 order_items.append(data)
             response_data['order_items'] = order_items
-            response_data['store_logo'] = store.logo.url
+            if store.logo and hasattr(store.logo, 'url'):
+                response_data['store_logo'] = store.logo.url
+            else:
+                response_data['store_logo'] = ''
             response_data['store_id'] = store.store_id
             response_data['store_location'] = store.name
             response_data['order_url'] = store.order_url
@@ -58,6 +62,8 @@ class StoreViewSet(ModelViewSet):
             response_data['screen_flash'] = store.screen_flash
             response_data['survey_url'] = store.survey_url
             response_data['order_rank'] = store.order_rank
+            response_data['pickup_message'] = store.pickup_message
+            response_data['curside_message'] = store.curside_message
             return Response(response_data, status=status.HTTP_200_OK)
         except ObjectDoesNotExist:
             return Response({"message": "Please verify your phone number."})
@@ -125,17 +131,62 @@ class StoreViewSet(ModelViewSet):
     @action(detail=False, methods=['post'], permission_classes=[IsOnTable], url_path='get_customer_information')
     def get_customer_information(self, request):
         phone_number = request.data['phone_number']
+        store_id = request.data['storeId']
+        table_id = request.data['tableId']
         try:
             customer = Customer.objects.get(phone=phone_number)
         except Customer.DoesNotExist:
             return Response({"error": "Customer does not exists."}, status=status.HTTP_404_NOT_FOUND)
+        question = Message.objects.filter(store_id=store_id, table_id=table_id, phone=phone_number,
+                                          item_title='', type=Message.QUESTION,
+                                          is_seen=False).order_by('-created_at').first()
+        received_message = ''
+
+        store = Store.objects.get(store_id=store_id)
+        location = customer.dining_type.title
+        wait_time_frame = store.wait_time_frame
+        longest = 0
+        average = 0
+        customers = Customer.objects.filter(store_id=store_id,
+                                            table_id='wait_list',
+                                            is_in_store=True,
+                                            dining_type__title__iexact=location)
+        customers = Customer.objects.filter(store_id=store_id,
+                                            table_id='wait_list',
+                                            is_in_store=True,
+                                            dining_type__title__iexact=location,
+                                            start_time__gte=datetime.now() - timedelta(
+                                                minutes=wait_time_frame))
+        if len(customers) == 0:
+            customer = Customer.objects.filter(store_id=store_id,
+                                               table_id='wait_list',
+                                               is_in_store=True,
+                                               dining_type__title__iexact=location).order_by('-start_time').first()
+            if customer:
+                longest = int((datetime.now() - customer.start_time).total_seconds())
+                average = int((datetime.now() - customer.start_time).total_seconds())
+            else:
+                longest = 0
+                average = 0
+        else:
+            sum = 0
+            longest = 0
+            for customer in customers:
+                sum += (datetime.now() - customer.start_time).total_seconds()
+                if longest < (datetime.now() - customer.start_time).total_seconds():
+                    longest = (datetime.now() - customer.start_time).total_seconds()
+                    longest = int(longest)
+            average = int(sum / len(customers))
+        customer = Customer.objects.get(phone=phone_number)
         response = {
             "full_name": customer.full_name(),
             "number_in_party": customer.number_in_party,
             "dining_type": customer.dining_type.title,
-            "longest_wait": "12:12",
-            "average_wait": "10:10",
-            "actual_wait": int((datetime.now(timezone.utc) - customer.start_time).total_seconds()),
-            "phone_number": phone_number
+            "longest_wait": longest,
+            "average_wait": average,
+            "actual_wait": int((datetime.now() - customer.start_time).total_seconds()),
+            "phone_number": phone_number,
+            "received_message": received_message,
+            "parking_space": customer.parking_space
         }
         return Response(response, status=status.HTTP_200_OK)

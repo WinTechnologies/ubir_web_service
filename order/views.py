@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from rest_framework import status
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.response import Response
@@ -31,7 +31,7 @@ class OrderViewSet(ModelViewSet):
             order, created = Order.objects.get_or_create(customer=customer, store=store, service_item=service_item, session_token=customer.session_token)
             order.quantity = quantity
             order.table_id = table_id
-            order.start_time = datetime.now(timezone.utc)
+            order.start_time = datetime.now()
             order.save()
             data = OrderSerializer(instance=order).data
             return Response(data, status=status.HTTP_200_OK)

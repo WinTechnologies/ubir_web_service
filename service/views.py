@@ -1,7 +1,6 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from rest_framework import status
 from rest_framework.viewsets import ModelViewSet
-from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.core.exceptions import ObjectDoesNotExist
@@ -9,7 +8,7 @@ from phone_verify.base import response
 
 from .models import Serviceman, ServicemanConfig
 from order.models import Order
-from store.models import ServiceItem, Store, StoreTableStatus
+from store.models import Store, TableSeat
 from customer.models import Customer
 from chat.models import Message
 from .serializers import ServicemanSerializer
@@ -22,8 +21,8 @@ class ServiceViewSet(ModelViewSet):
     serializer_class = ServicemanSerializer
     queryset = Serviceman.objects.all()
 
-    @action(detail=False, methods=['post'], permission_classes=[IsServiceman], url_path='get_store_configs')
-    def get_store_configs(self, request):
+    @action(detail=False, methods=['post'], permission_classes=[IsServiceman], url_path='get_store_configuration')
+    def get_store_configuration(self, request):
         store_id = request.data['storeId']
         try:
             serviceman = Serviceman.objects.get(user=request.user)
@@ -38,8 +37,8 @@ class ServiceViewSet(ModelViewSet):
                 except:
                     data['table_filter'] = False # Not Selected
                 data['reset_table'] = 'Reset'
-                store_table_status = StoreTableStatus.objects.get(store=serviceman.store, table_seat=table_seat.table_seat)
-                data['table_status'] = store_table_status.status  # Open
+                table_status = TableSeat.objects.get(table_seat=table_seat.table_seat, table_id=serviceman.store.store_id + '.' + table_seat.table_seat)
+                data['table_status'] = table_status.status  # Open
                 response_data.append(data)
             return Response({"store_config": response_data, "sms_text_guest_alert": store.sms_text_guest_alert}, status=status.HTTP_200_OK)
         except ObjectDoesNotExist:
@@ -71,13 +70,13 @@ class ServiceViewSet(ModelViewSet):
         table_seat = request.data['table_seat']
         serviceman = Serviceman.objects.get(user=request.user)
         try:
-            store_table_status = StoreTableStatus.objects.get(store=serviceman.store, table_seat=table_seat)
-            if store_table_status.status == StoreTableStatus.OPEN:
-                store_table_status.status = StoreTableStatus.CLOSED
+            table_seat = TableSeat.objects.get(table_seat=table_seat, table_id=serviceman.store.store_id + '.' + table_seat)
+            if table_seat.status == TableSeat.OPEN:
+                table_seat.status = TableSeat.CLOSED
             else:
-                store_table_status.status = StoreTableStatus.OPEN
-            store_table_status.save()
-            return Response({"message": store_table_status.status}, status=status.HTTP_200_OK)
+                table_seat.status = TableSeat.OPEN
+            table_seat.save()
+            return Response({"message": table_seat.status}, status=status.HTTP_200_OK)
         except ObjectDoesNotExist:
             return Response({"message": "Internal Server Error"})
 
@@ -103,11 +102,12 @@ class ServiceViewSet(ModelViewSet):
             serviceman_configs = ServicemanConfig.objects.filter(serviceman=serviceman)
             for serviceman_config in serviceman_configs:
                 table_ids.append(serviceman_config.table_seat)
+            table_ids.append('Wait')
             orders = Order.objects.filter(store=serviceman.store, table_id__in=table_ids).exclude(status=Order.COMPLETED)
             response_data = []
             for order in orders:
                 data = OrderSerializer(instance=order).data
-                data['timer'] = int((datetime.now(timezone.utc) - order.start_time).total_seconds())
+                data['timer'] = int((datetime.now() - order.start_time).total_seconds())
                 response_data.append(data)
             return Response(response_data, status=status.HTTP_200_OK)
         except Exception as e:

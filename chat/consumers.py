@@ -1,5 +1,8 @@
 # chat/consumers.py
 import json
+import random
+import string
+
 from datetime import datetime, timezone
 from django.db.models import Q
 from rest_framework.authtoken.models import Token
@@ -10,7 +13,7 @@ from order.models import Order
 from chat.models import Message
 from customer.models import Customer
 from log.models import CustomerLog, ServiceLog
-from store.models import Store, ServiceItem, StoreTableStatus
+from store.models import Store, ServiceItem, TableSeat
 from chat.serializers import MessageSerializer
 from order.serializers import OrderSerializer
 
@@ -72,14 +75,18 @@ class ChatConsumer(AsyncWebsocketConsumer):
             order.quantity = order.quantity + 1
             order.table_id = table_id
             if created:
-                order.start_time = datetime.now(timezone.utc)
+                order.start_time = datetime.now()
             else:
                 if order.status == Order.COMPLETED:
-                    order.start_time = datetime.now(timezone.utc)
-            # order.status = Order.PENDING
+                    order.start_time = datetime.now()
             order.save()
+            # Save the last time the customer taps the item
+            table_seat = TableSeat.objects.get(table_id=store_id + "." + table_id, table_seat=table_id)
+            table_seat.last_time_customer_tap = datetime.now()
+            table_seat.save()
             data = OrderSerializer(instance=order).data
-            data['timer'] = int((datetime.now(timezone.utc) - order.start_time).total_seconds())
+            data['timer'] = int((datetime.now() - order.start_time).total_seconds())
+            data['last'] = int((datetime.now() - table_seat.last_time_customer_tap).total_seconds())
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
@@ -92,6 +99,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             token = data['token']
             store_id = data['store_id']
             table_seat = data['table_seat']
+            phone_number = data['phone_number']
             store = Store.objects.get(store_id=store_id)
             token = Token.objects.get(key=token)
             serviceman = Serviceman.objects.get(user=token.user)
@@ -99,11 +107,39 @@ class ChatConsumer(AsyncWebsocketConsumer):
             order.status = Order.INPROGRESS
             order.save()
             data = OrderSerializer(instance=order).data
-            data['timer'] = int((datetime.now(timezone.utc) - order.start_time).total_seconds())
-            service_log = ServiceLog(company=store.company.name, store=store.name, login=serviceman.user.username,
-                                     tap="Item", content=f"{table_seat}|{order.quantity}|{convert(data['timer'])}|{order.service_item.title}",
-                                     session_token=order.customer.session_token)
-            service_log.save()
+            data['timer'] = int((datetime.now() - order.start_time).total_seconds())
+            data['phone_number'] = phone_number
+            # The Serviceman taps 'Clean & Disinfect Table' item
+            if order.service_item.title == 'Clean & Disinfect Table':
+                table_seat = TableSeat.objects.get(table_seat=table_seat,
+                                                   table_id=store.store_id + '.' + table_seat)
+                table_seat.action_status = TableSeat.CLEANING
+                table_seat.last_time_status_changed = datetime.now()
+                table_seat.save()
+                data['table_status'] = TableSeat.CLEANING
+                service_log = ServiceLog(company=store.company.name, store=store.name, login=serviceman.user.username,
+                                         tap="Item",
+                                         content=f"{table_seat}|{order.quantity}|{convert(data['timer'])}|{order.service_item.title}",
+                                         session_token=token)
+                service_log.save()
+            elif order.service_item.title == store.pickup_message:
+                service_log = ServiceLog(company=store.company.name, store=store.name, login=serviceman.user.username,
+                                         tap="Item",
+                                         content=f"{table_seat}|{order.quantity}|{convert(data['timer'])}|{order.service_item.title}",
+                                         session_token=token)
+                service_log.save()
+            elif order.service_item.title == store.curside_message:
+                service_log = ServiceLog(company=store.company.name, store=store.name, login=serviceman.user.username,
+                                         tap="Item",
+                                         content=f"{table_seat}|{order.quantity}|{convert(data['timer'])}|{order.service_item.title}",
+                                         session_token=token)
+                service_log.save()
+            else:
+                service_log = ServiceLog(company=store.company.name, store=store.name, login=serviceman.user.username,
+                                         tap="Item",
+                                         content=f"{table_seat}|{order.quantity}|{convert(data['timer'])}|{order.service_item.title}",
+                                         session_token=order.customer.session_token)
+                service_log.save()
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
@@ -116,25 +152,63 @@ class ChatConsumer(AsyncWebsocketConsumer):
             token = data['token']
             store_id = data['store_id']
             table_seat = data['table_seat']
+            phone_number = data['phone_number']
             order = Order.objects.get(record_number=record_number)
             quantity = order.quantity
             order.status = Order.COMPLETED
             order.quantity = 0
             order.save()
             data = OrderSerializer(instance=order).data
+            data['phone_number'] = phone_number
             item_title = order.service_item.title
-            messages = Message.objects.filter(table_id=table_seat, store_id=store_id, item_title=item_title, phone=order.customer.phone)
-            for message in messages:
-                message.is_seen = True
-                message.save()
             store = Store.objects.get(store_id=store_id)
             token = Token.objects.get(key=token)
             serviceman = Serviceman.objects.get(user=token.user)
-            timer = int((datetime.now(timezone.utc) - order.start_time).total_seconds())
-            service_log = ServiceLog(company=store.company.name, store=store.name, login=serviceman.user.username,
-                                     tap="Timer", content=f"{table_seat}|{quantity}|{convert(timer)}|{order.service_item.title}",
-                                     session_token=order.customer.session_token)
-            service_log.save()
+            timer = int((datetime.now() - order.start_time).total_seconds())
+            if order.service_item.title == 'Clean & Disinfect Table':
+                table_seat = TableSeat.objects.get(table_seat=table_seat,
+                                                   table_id=store.store_id + '.' + table_seat)
+                customers = Customer.objects.filter(store_id=store.store_id, table_id=table_seat.table_seat, is_in_store=True)
+                if len(customers) > 0:
+                    table_seat.action_status = TableSeat.OCCUPIED
+                else:
+                    table_seat.action_status = TableSeat.AVAILABLE
+                table_seat.last_time_status_changed = datetime.now()
+                table_seat.save()
+                data['table_status'] = table_seat.action_status
+                service_log = ServiceLog(company=store.company.name, store=store.name, login=serviceman.user.username,
+                                         tap="Timer",
+                                         content=f"{table_seat}|{quantity}|{convert(timer)}|{order.service_item.title}",
+                                         session_token=token)
+                service_log.save()
+            elif order.service_item.title == store.pickup_message:
+                service_log = ServiceLog(company=store.company.name, store=store.name, login=serviceman.user.username,
+                                         tap="Timer",
+                                         content=f"{table_seat}|{quantity}|{convert(timer)}|{order.service_item.title}",
+                                         session_token=token)
+                service_log.save()
+                customer = Customer.objects.get(phone=phone_number)
+                customer.is_in_store = False
+                customer.save()
+            elif order.service_item.title == store.curside_message:
+                service_log = ServiceLog(company=store.company.name, store=store.name, login=serviceman.user.username,
+                                         tap="Timer",
+                                         content=f"{table_seat}|{quantity}|{convert(timer)}|{order.service_item.title}",
+                                         session_token=token)
+                service_log.save()
+                customer = Customer.objects.get(phone=phone_number)
+                customer.is_in_store = False
+                customer.save()
+            else:
+                service_log = ServiceLog(company=store.company.name, store=store.name, login=serviceman.user.username,
+                                         tap="Timer", content=f"{table_seat}|{quantity}|{convert(timer)}|{order.service_item.title}",
+                                         session_token=order.customer.session_token)
+                service_log.save()
+                messages = Message.objects.filter(table_id=table_seat, store_id=store_id, item_title=item_title,
+                                                  phone=order.customer.phone)
+                for message in messages:
+                    message.is_seen = True
+                    message.save()
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
@@ -153,7 +227,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             token = Token.objects.get(key=token)
             serviceman = Serviceman.objects.get(user=token.user)
             order = Order.objects.get(record_number=record_number)
-            timer = int((datetime.now(timezone.utc) - order.start_time).total_seconds())
+            timer = int((datetime.now() - order.start_time).total_seconds())
             message, created = Message.objects.get_or_create(table_id=table_seat,
                                                              store_id=store_id,
                                                              item_title=item_title,
@@ -196,7 +270,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             message.save()
             data = MessageSerializer(instance=message).data
             order = Order.objects.get(Q(customer=customer) & Q(store=store) & Q(service_item__title=item_title) & Q(table_id=table_seat) & ~Q(status=Order.COMPLETED))
-            timer = int((datetime.now(timezone.utc) - order.start_time).total_seconds())
+            timer = int((datetime.now() - order.start_time).total_seconds())
             customer_log = CustomerLog(company=store.company.name, store=store.name, login=phone_number,
                                        tap="Message", content=f"{table_seat}|{order.record_number}|{order.service_item.title}|{order.quantity}|{convert(timer)}|{message_text}",
                                        session_token=session_token)
@@ -289,13 +363,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
             token = Token.objects.get(key=token)
             serviceman = Serviceman.objects.get(user=token.user)
             try:
-                store_table_status = StoreTableStatus.objects.get(store=serviceman.store, table_seat=table_seat)
-                if store_table_status.status == StoreTableStatus.OPEN:
-                    store_table_status.status = StoreTableStatus.CLOSED
+                table_seat = TableSeat.objects.get(table_seat=table_seat, table_id=serviceman.store.store_id + '.' + table_seat)
+                if table_seat.status == TableSeat.OPEN:
+                    table_seat.status = TableSeat.CLOSED
                 else:
-                    store_table_status.status = StoreTableStatus.OPEN
-                store_table_status.save()
-                response_data = {"status": store_table_status.status, "table_seat": table_seat}
+                    table_seat.status = TableSeat.OPEN
+                table_seat.save()
+                response_data = {"status": table_seat.status, "table_seat": table_seat.table_seat}
             except:
                 response_data = {}
             await self.channel_layer.group_send(
@@ -325,12 +399,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 for order in orders:
                     order.status = Order.COMPLETED
                     order.save()
-                    phone_numbers.append(order.customer.phone)
                 messages = Message.objects.filter(store_id=store_id, table_id=table_seat, is_seen=False)
                 for message in messages:
                     message.is_seen = True
                     message.save()
-                response_data = {"message": "success", "store_id": store_id, "table_id": table_seat, "phone_numbers": phone_numbers}
+                table_seat = TableSeat.objects.get(table_seat=table_seat, table_id=store_id + '.' + table_seat)
+                table_seat.seated_time = None
+                table_seat.ordered_time = None
+                table_seat.save()
+                response_data = {"message": "success", "store_id": store_id, "table_id": table_seat.table_seat}
             except:
                 response_data = {}
             await self.channel_layer.group_send(
@@ -338,6 +415,213 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 {
                     'type': 'reset_table',
                     'message': response_data
+                }
+            )
+        elif data['command'] == 'assign_table':
+            token = data['token']
+            table_seat = data['table_seat']
+            store_id = data['store_id']
+            phone_number = data["phone_number"]
+            config_or_wait = data["config_or_wait"]
+            response_data = {}
+            try:
+                customer = Customer.objects.get(phone=phone_number)
+            except:
+                customer = Customer(phone=phone_number)
+            customer.store_id = store_id
+            customer.table_id = table_seat
+            customer.is_in_store = True
+            session_token = "".join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(25))
+            customer.session_token = session_token
+            customer.save()
+            table_seat = TableSeat.objects.get(table_seat=table_seat, table_id=store_id + '.' + table_seat)
+            table_seat.action_status = TableSeat.OCCUPIED
+            table_seat.last_time_status_changed = datetime.now()
+            table_seat.seated_time = datetime.now()
+            table_seat.save()
+            # table_seat
+            response_data = {"is_authenticated": True,
+                             "config_or_wait": config_or_wait,
+                             "session_token": session_token,
+                             "phone_number": phone_number,
+                             "table_seat": table_seat.table_seat,
+                             "store_id": store_id,
+                             "table_status": table_seat.action_status,
+                             "seated_time": table_seat.seated_time.strftime("%H:%M %p")}
+            await self.channel_layer.group_send(self.room_group_name,
+                                                {'type': 'assign_table', 'message': response_data})
+        elif data['command'] == 'clean_table':
+            token = data['token']
+            store_id = data['store_id']
+            table_seat = data['table_seat']
+            service_item_title = data['service_item_title']
+            response_data = {}
+            store = Store.objects.get(store_id=store_id)
+            service_item, created = ServiceItem.objects.get_or_create(title=service_item_title)
+            try:
+                order = Order.objects.get(Q(store=store) & Q(table_id=table_seat) & Q(service_item=service_item) & (
+                            Q(status=Order.INPROGRESS) | Q(status=Order.INPROGRESS_PENDING)))
+                order.status = Order.INPROGRESS_PENDING
+            except:
+                order = None
+                pass
+            if not order:
+                order, created = Order.objects.get_or_create(table_id=table_seat, store=store, service_item=service_item,
+                                                             status=Order.PENDING, session_token=token)
+            order.quantity = 1
+            order.table_id = table_seat
+            if created:
+                order.start_time = datetime.now()
+            else:
+                if order.status == Order.COMPLETED:
+                    order.start_time = datetime.now()
+            order.save()
+            data = OrderSerializer(instance=order).data
+            data['timer'] = int((datetime.now() - order.start_time).total_seconds())
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'clean_table',
+                    'message': data
+                }
+            )
+        elif data['command'] == 'new_message_to_wait_list':
+            phone_number = data['phone_number']
+            message_text = data['message']
+            store_id = data['store_id']
+            token = data['token']
+            customer = Customer.objects.get(phone=phone_number)
+            message, created = Message.objects.get_or_create(table_id=customer.table_id,
+                                                             store_id=store_id,
+                                                             item_title='',
+                                                             type=Message.QUESTION,
+                                                             message=message_text,
+                                                             phone=phone_number,
+                                                             session_token=customer.session_token,
+                                                             is_seen=False)
+            message.save()
+            data = MessageSerializer(instance=message).data
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'new_message_to_wait_list',
+                    'message': data
+                }
+            )
+        elif data['command'] == 'new_message_to_host':
+            phone_number = data['phone_number']
+            message_text = data['message']
+            store_id = data['store_id']
+            table_seat = data['table_seat']
+            session_token = data['session_token']
+            customer = Customer.objects.get(phone=phone_number)
+            message, created = Message.objects.get_or_create(table_id=table_seat,
+                                                             store_id=store_id,
+                                                             item_title='',
+                                                             type=Message.ANSWER,
+                                                             message=message_text,
+                                                             phone=phone_number,
+                                                             session_token=session_token,
+                                                             is_seen=False)
+            message.save()
+            data = MessageSerializer(instance=message).data
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'new_message_to_host',
+                    'message': data
+                }
+            )
+        elif data['command'] == 'add_parking_space':
+            phone_number = data['phone_number']
+            parking_space = data['parking_space']
+            customer = Customer.objects.get(phone=phone_number)
+            customer.parking_space = parking_space
+            customer.save()
+            data = {"phone_number": phone_number, "parking_space": parking_space}
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'add_parking_space',
+                    'message': data
+                }
+            )
+        elif data['command'] == 'deliver_to_car':
+            phone_number = data['phone_number']
+            store_id = data['store_id']
+            token = data['token']
+            service_item_title = data['message']
+            table_seat = 'Wait'
+            store = Store.objects.get(store_id=store_id)
+            customer = Customer.objects.get(phone=phone_number)
+            service_item, created = ServiceItem.objects.get_or_create(title=service_item_title)
+            try:
+                order = Order.objects.get(Q(store=store) & Q(table_id=table_seat) & Q(service_item=service_item) & (
+                        Q(status=Order.INPROGRESS) | Q(status=Order.INPROGRESS_PENDING)))
+                order.status = Order.INPROGRESS_PENDING
+            except:
+                order = None
+                pass
+            if not order:
+                order, created = Order.objects.get_or_create(table_id=table_seat, store=store,
+                                                             service_item=service_item,
+                                                             status=Order.PENDING, session_token=token)
+            order.quantity = 1
+            order.table_id = table_seat
+            order.customer = customer
+            if created:
+                order.start_time = datetime.now()
+            else:
+                if order.status == Order.COMPLETED:
+                    order.start_time = datetime.now()
+            order.save()
+            data = OrderSerializer(instance=order).data
+            data['timer'] = int((datetime.now() - order.start_time).total_seconds())
+            data['phone_number'] = phone_number
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'deliver_to_car',
+                    'message': data
+                }
+            )
+        elif data['command'] == 'pickup_bar':
+            phone_number = data['phone_number']
+            store_id = data['store_id']
+            token = data['token']
+            service_item_title = data['message']
+            table_seat = 'Wait'
+            store = Store.objects.get(store_id=store_id)
+            customer = Customer.objects.get(phone=phone_number)
+            service_item, created = ServiceItem.objects.get_or_create(title=service_item_title)
+            try:
+                order = Order.objects.get(Q(store=store) & Q(table_id=table_seat) & Q(service_item=service_item) & (
+                        Q(status=Order.INPROGRESS) | Q(status=Order.INPROGRESS_PENDING)))
+                order.status = Order.INPROGRESS_PENDING
+            except:
+                order = None
+                pass
+            if not order:
+                order, created = Order.objects.get_or_create(table_id=table_seat, store=store,
+                                                             service_item=service_item,
+                                                             status=Order.PENDING, session_token=token)
+            order.quantity = 1
+            order.table_id = table_seat
+            order.customer = customer
+            if created:
+                order.start_time = datetime.now()
+            else:
+                if order.status == Order.COMPLETED:
+                    order.start_time = datetime.now()
+            order.save()
+            data = OrderSerializer(instance=order).data
+            data['timer'] = int((datetime.now() - order.start_time).total_seconds())
+            data['phone_number'] = phone_number
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'pickup_bar',
+                    'message': data
                 }
             )
 
@@ -413,4 +697,53 @@ class ChatConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             'message': message,
             'command': 'set_reset_table'
+        }))
+
+    async def assign_table(self, data):
+        message = data['message']
+        await self.send(text_data=json.dumps({
+            'message': message,
+            'command': 'set_assign_table'
+        }))
+
+    async def clean_table(self, data):
+        message = data['message']
+        await self.send(text_data=json.dumps({
+            'message': message,
+            'command': 'set_clean_table'
+        }))
+
+    async def new_message_to_wait_list(self, data):
+        message = data['message']
+        await self.send(text_data=json.dumps({
+            'message': message,
+            'command': 'message_from_host_to_wait_list'
+        }))
+
+    async def new_message_to_host(self, data):
+        message = data['message']
+        await self.send(text_data=json.dumps({
+            'message': message,
+            'command': 'message_from_wait_list_to_host'
+        }))
+
+    async def add_parking_space(self, data):
+        message = data['message']
+        await self.send(text_data=json.dumps({
+            'message': message,
+            'command': 'set_parking_space'
+        }))
+
+    async def deliver_to_car(self, data):
+        message = data['message']
+        await self.send(text_data=json.dumps({
+            'message': message,
+            'command': 'set_deliver_to_car'
+        }))
+
+    async def pickup_bar(self, data):
+        message = data['message']
+        await self.send(text_data=json.dumps({
+            'message': message,
+            'command': 'set_pickup_bar'
         }))

@@ -1,7 +1,6 @@
-from django import forms
 from django.contrib import admin
 from django_better_admin_arrayfield.admin.mixins import DynamicArrayMixin
-from .models import ServiceItem, TableSeat, Store, DiningType, Company, StoreTableStatus
+from .models import ServiceItem, TableSeat, Store, DiningType, Company
 
 
 class ServiceItemAdmin(admin.ModelAdmin):
@@ -35,27 +34,6 @@ class StoreAdmin(admin.ModelAdmin, DynamicArrayMixin):
         DiningTypeMembershipInline
     ]
     exclude = ('service_item', 'table_seat', 'dining_type', )
-
-    def save_model(self, request, obj, form, change):
-        """
-        Given a model instance save it to the database.
-        """
-        obj.save()
-        for key in request.POST:
-            if key.startswith('Store_table_seat-') and key.endswith('-tableseat'):
-                id = key.replace('Store_table_seat-', '').replace('-tableseat', '')
-                table_seat_id = request.POST[key]
-                if table_seat_id != '':
-                    table_seat = TableSeat.objects.get(pk=table_seat_id).table_seat
-                    if 'Store_table_seat-' + id + '-DELETE' in request.POST:
-                        if request.POST['Store_table_seat-' + id + '-DELETE'] == 'on':
-                            StoreTableStatus.objects.filter(store=obj, table_seat=table_seat).delete()
-                    else:
-                        try:
-                            StoreTableStatus.objects.get(store=obj, table_seat=table_seat)
-                        except:
-                            store_table_status = StoreTableStatus(store=obj, table_seat=table_seat, status=StoreTableStatus.OPEN)
-                            store_table_status.save()
 
     def save_related(self, request, form, formsets, change):
         super(StoreAdmin, self).save_related(request, form, formsets, change)

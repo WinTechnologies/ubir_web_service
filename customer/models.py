@@ -21,9 +21,11 @@ class Customer(models.Model):
     last_name = models.CharField(max_length=25, null=True, blank=True)
     number_in_party = models.IntegerField(null=True, blank=True)
     dining_type = models.ForeignKey(DiningType, blank=True, null=True, on_delete=models.CASCADE)
+    parking_space = models.CharField(max_length=25, default='', verbose_name="Parking Space #", blank=True)
 
     def full_name(self):
         return f"{self.first_name} {self.last_name}"
+
     def __str__(self):
         return f"{self.record_number} <-> {self.phone}"
 
