@@ -436,7 +436,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
                              "last_name": customer.last_name,
                              "table_seat": table_seat,
                              "store_id": store_id,
-                             "message": "Your table is ready"}
+                             "message": "Your table is ready",
+                             "assigned": True}
             await self.channel_layer.group_send(self.room_group_name,
                                                 {'type': 'assign_table', 'message': response_data})
         elif data['command'] == 'seat_table':
@@ -453,7 +454,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             customer.waked = False
             customer.assigned = False
             customer.seated = True
-            customer.assigned_table_id = ''
+            customer.assigned_table_id = table_seat
             customer.save()
             # Send SMS Message to wake the customer's phone up
             if customer.phone:

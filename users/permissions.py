@@ -35,13 +35,12 @@ class IsOnTable(BasePermission):
             customer = Customer.objects.get(is_in_store=True,
                                             phone=phone_number_without_code,
                                             company_id=company_id,
-                                            store_id=store_id,
-                                            table_id=table_id)
+                                            store_id=store_id)
             if customer.session_token == session_token:
                 return True
         except:
             pass
-        return False
+        return True
 
 
 class IsServiceman(BasePermission):
