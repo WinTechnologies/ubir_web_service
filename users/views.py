@@ -22,7 +22,8 @@ class CustomAuthToken(ObtainAuthToken):
             if serviceman.active:
                 return Response({
                     'token': token.key,
-                    'store_id': serviceman.store.store_id
+                    'store_id': serviceman.store.store_id,
+                    'company_id': serviceman.store.company.company_id
                 })
             else:
                 return Response({'error': 'You are not allowed to login'})

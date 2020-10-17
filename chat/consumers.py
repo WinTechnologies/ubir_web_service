@@ -13,9 +13,10 @@ from order.models import Order
 from chat.models import Message
 from customer.models import Customer
 from log.models import CustomerLog, ServiceLog
-from store.models import Store, ServiceItem, TableSeat
+from store.models import Store, ServiceItem, TableSeat, DiningType
 from chat.serializers import MessageSerializer
 from order.serializers import OrderSerializer
+from .utils import SMSTextSender
 
 
 def convert(seconds):
@@ -168,7 +169,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             if order.service_item.title == 'Clean & Disinfect Table':
                 table_seat = TableSeat.objects.get(table_seat=table_seat,
                                                    table_id=store.store_id + '.' + table_seat)
-                customers = Customer.objects.filter(store_id=store.store_id, table_id=table_seat.table_seat, is_in_store=True)
+                customers = Customer.objects.filter(Q(store_id=store.store_id) & Q(table_id=table_seat.table_seat) & (Q(is_in_store=True) | Q(seated=True)))
                 if len(customers) > 0:
                     table_seat.action_status = TableSeat.OCCUPIED
                 else:
@@ -391,6 +392,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     customers = Customer.objects.filter(is_in_store=True, store_id=store_id, table_id=table_seat)
                     for customer in customers:
                         customer.is_in_store = False
+                        customer.seated = False
+                        customer.waked = True
+                        customer.assigned = False
                         customer.save()
                 except:
                     pass
@@ -418,38 +422,103 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 }
             )
         elif data['command'] == 'assign_table':
-            token = data['token']
             table_seat = data['table_seat']
             store_id = data['store_id']
-            phone_number = data["phone_number"]
-            config_or_wait = data["config_or_wait"]
+            record_number = data["record_number"]
+            customer = Customer.objects.get(record_number=record_number)
+            customer.assigned = True
+            customer.store_id = store_id
+            customer.assigned_table_id=table_seat
+            customer.save()
+            # table_seat
+            response_data = {"record_number": record_number,
+                             "phone_number": customer.phone,
+                             "last_name": customer.last_name,
+                             "table_seat": table_seat,
+                             "store_id": store_id,
+                             "message": "Your table is ready"}
+            await self.channel_layer.group_send(self.room_group_name,
+                                                {'type': 'assign_table', 'message': response_data})
+        elif data['command'] == 'seat_table':
+            table_seat = data['table_seat']
+            store_id = data['store_id']
+            record_number = data["record_number"]
             response_data = {}
-            try:
-                customer = Customer.objects.get(phone=phone_number)
-            except:
-                customer = Customer(phone=phone_number)
+            customer = Customer.objects.get(record_number=record_number)
             customer.store_id = store_id
             customer.table_id = table_seat
             customer.is_in_store = True
             session_token = "".join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(25))
             customer.session_token = session_token
+            customer.waked = False
+            customer.assigned = False
+            customer.seated = True
+            customer.assigned_table_id = ''
+            customer.save()
+            # Send SMS Message to wake the customer's phone up
+            if customer.phone:
+                try:
+                    sms_text_sender = SMSTextSender()
+                    sms_text_sender.send_message(customer.phone)
+                except:
+                    pass
+            table_seat = TableSeat.objects.get(table_seat=table_seat, table_id=store_id + '.' + table_seat)
+            table_seat.action_status = TableSeat.OCCUPIED
+            table_seat.last_time_status_changed = datetime.now()
+            table_seat.seated_time = datetime.now()
+            table_seat.save()
+            messages = Message.objects.filter(store_id=store_id, table_id='wait_list', phone=customer.phone, is_seen=False)
+            for message in messages:
+                message.is_seen = True
+                message.save()
+            # table_seat
+            response_data = {"is_authenticated": True,
+                             "session_token": session_token,
+                             "record_number": record_number,
+                             "phone_number": customer.phone,
+                             "table_seat": table_seat.table_seat,
+                             "store_id": store_id,
+                             "table_status": table_seat.action_status,
+                             "seated_time": table_seat.seated_time.strftime("%H:%M %p"),
+                             "waked": customer.waked,
+                             "assigned_table_id": table_seat.table_seat}
+            await self.channel_layer.group_send(self.room_group_name,
+                                                {'type': 'seat_table', 'message': response_data})
+        elif data['command'] == 'login_table':
+            table_seat = data['table_seat']
+            store_id = data['store_id']
+            phone_number = data["phone_number"]
+            response_data = {}
+            customer = Customer.objects.get(phone=phone_number)
+            customer.store_id = store_id
+            customer.table_id = table_seat
+            customer.is_in_store = True
+            customer.assigned = False
+            customer.assigned_table_id = ''
+            session_token = "".join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(25))
+            customer.session_token = session_token
+            customer.waked = True
             customer.save()
             table_seat = TableSeat.objects.get(table_seat=table_seat, table_id=store_id + '.' + table_seat)
             table_seat.action_status = TableSeat.OCCUPIED
             table_seat.last_time_status_changed = datetime.now()
             table_seat.seated_time = datetime.now()
             table_seat.save()
+            messages = Message.objects.filter(store_id=store_id, table_id='wait_list', phone=customer.phone, is_seen=False)
+            for message in messages:
+                message.is_seen = True
+                message.save()
             # table_seat
             response_data = {"is_authenticated": True,
-                             "config_or_wait": config_or_wait,
                              "session_token": session_token,
-                             "phone_number": phone_number,
+                             "phone_number": customer.phone,
                              "table_seat": table_seat.table_seat,
                              "store_id": store_id,
                              "table_status": table_seat.action_status,
-                             "seated_time": table_seat.seated_time.strftime("%H:%M %p")}
+                             "seated_time": table_seat.seated_time.strftime("%H:%M %p"),
+                             "waked": customer.waked}
             await self.channel_layer.group_send(self.room_group_name,
-                                                {'type': 'assign_table', 'message': response_data})
+                                                {'type': 'login_table', 'message': response_data})
         elif data['command'] == 'clean_table':
             token = data['token']
             store_id = data['store_id']
@@ -491,6 +560,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
             store_id = data['store_id']
             token = data['token']
             customer = Customer.objects.get(phone=phone_number)
+            messages = Message.objects.filter(store_id=store_id, table_id='wait_list', phone=phone_number,
+                                              is_seen=False)
+            for message in messages:
+                message.is_seen = True
+                message.save()
             message, created = Message.objects.get_or_create(table_id=customer.table_id,
                                                              store_id=store_id,
                                                              item_title='',
@@ -547,13 +621,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 }
             )
         elif data['command'] == 'deliver_to_car':
-            phone_number = data['phone_number']
+            record_number = data['record_number']
             store_id = data['store_id']
             token = data['token']
             service_item_title = data['message']
             table_seat = 'Wait'
             store = Store.objects.get(store_id=store_id)
-            customer = Customer.objects.get(phone=phone_number)
+            customer = Customer.objects.get(record_number=record_number)
             service_item, created = ServiceItem.objects.get_or_create(title=service_item_title)
             try:
                 order = Order.objects.get(Q(store=store) & Q(table_id=table_seat) & Q(service_item=service_item) & (
@@ -577,7 +651,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
             order.save()
             data = OrderSerializer(instance=order).data
             data['timer'] = int((datetime.now() - order.start_time).total_seconds())
-            data['phone_number'] = phone_number
+            data['record_number'] = record_number
+            data['phone_number'] = customer.phone
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
@@ -586,13 +661,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 }
             )
         elif data['command'] == 'pickup_bar':
-            phone_number = data['phone_number']
+            record_number = data['record_number']
             store_id = data['store_id']
             token = data['token']
             service_item_title = data['message']
             table_seat = 'Wait'
             store = Store.objects.get(store_id=store_id)
-            customer = Customer.objects.get(phone=phone_number)
+            customer = Customer.objects.get(record_number=record_number)
             service_item, created = ServiceItem.objects.get_or_create(title=service_item_title)
             try:
                 order = Order.objects.get(Q(store=store) & Q(table_id=table_seat) & Q(service_item=service_item) & (
@@ -616,12 +691,52 @@ class ChatConsumer(AsyncWebsocketConsumer):
             order.save()
             data = OrderSerializer(instance=order).data
             data['timer'] = int((datetime.now() - order.start_time).total_seconds())
-            data['phone_number'] = phone_number
+            data['record_number'] = record_number
+            data['phone_number'] = customer.phone
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
                     'type': 'pickup_bar',
                     'message': data
+                }
+            )
+        elif data['command'] == 'add_wait_list':
+            company_id = data['company_id']
+            store_id = data['store_id']
+            table_id = data['table_id']
+            last_name = data['last_name']
+            number_in_party = data['number_in_party']
+            dining_type = data['dining_type']
+            customer = Customer(last_name=last_name)
+            customer.phone = ''
+            customer.company_id = company_id
+            customer.store_id = store_id
+            customer.table_id = table_id
+            customer.last_name = last_name
+            customer.number_in_party = number_in_party
+            dining_type = DiningType.objects.get(title=dining_type)
+            customer.dining_type = dining_type
+            customer.is_in_store = True
+            customer.start_time = datetime.now()
+            customer.save()
+            response_data = {}
+            response_data['record_number'] = customer.record_number
+            response_data['table_id'] = table_id
+            response_data['store_id'] = store_id
+            response_data['last_name'] = customer.last_name
+            response_data['first_name'] = customer.first_name
+            response_data['phone_number'] = customer.phone
+            response_data['party_size'] = customer.number_in_party
+            response_data['dining_option'] = customer.dining_type.title
+            response_data['parking_space'] = customer.parking_space
+            response_data['action'] = customer.dining_type.action_type
+            response_data['timer'] = int((datetime.now() - customer.start_time).total_seconds())
+            response_data['answer'] = 'Please tell the customer verbally'
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'set_wait_list',
+                    'message': response_data
                 }
             )
 
@@ -657,7 +772,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
     # Receive message from room group
     async def new_message_to_service(self, data):
         message = data['message']
-
         # Send message to WebSocket
         await self.send(text_data=json.dumps({
             'message': message,
@@ -706,6 +820,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'command': 'set_assign_table'
         }))
 
+    async def seat_table(self, data):
+        message = data['message']
+        await self.send(text_data=json.dumps({
+            'message': message,
+            'command': 'set_seat_table'
+        }))
+
     async def clean_table(self, data):
         message = data['message']
         await self.send(text_data=json.dumps({
@@ -746,4 +867,25 @@ class ChatConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             'message': message,
             'command': 'set_pickup_bar'
+        }))
+
+    async def logout_host(self, data):
+        message = data['message']
+        await self.send(text_data=json.dumps({
+            'message': message,
+            'command': 'set_logout_host'
+        }))
+
+    async def set_wait_list(self, data):
+        message = data['message']
+        await self.send(text_data=json.dumps({
+            'message': message,
+            'command': 'set_wait_list'
+        }))
+
+    async def login_table(self, data):
+        message = data['message']
+        await self.send(text_data=json.dumps({
+            'message': message,
+            'command': 'set_login_table'
         }))

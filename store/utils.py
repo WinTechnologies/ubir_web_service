@@ -6,6 +6,12 @@ from rest_framework_simplejwt.tokens import RefreshToken
 logger = logging.getLogger('django')
 
 
+def rchop(s, suffix):
+    if suffix and s.endswith(suffix):
+        return s[:-len(suffix)]
+    return s
+
+
 def id_generator(size=6):
     return "".join(str(random.randint(0, 9)) for _ in range(size))
 

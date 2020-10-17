@@ -62,7 +62,7 @@ class HostViewSet(ModelViewSet):
         store_id = request.data['store_id']
         store = Store.objects.get(store_id=store_id)
         wait_time_frame = store.wait_time_frame
-        locations = ['inside', 'outside', 'bar']
+        locations = ['Inside', 'Outside', 'Bar', 'First Available']
         for location in locations:
             data = {}
             data['location'] = location
@@ -103,10 +103,11 @@ class HostViewSet(ModelViewSet):
     @action(detail=False, methods=['post'], permission_classes=[IsServiceman], url_path='get_wait_list')
     def get_wait_list(self, request):
         store_id = request.data['store_id']
-        customers = Customer.objects.filter(store_id=store_id, table_id='wait_list', is_in_store=True)
+        customers = Customer.objects.filter(store_id=store_id, table_id='wait_list', is_in_store=True, seated=False)
         response_data = []
         for customer in customers:
             data = {}
+            data['record_number'] = customer.record_number
             data['last_name'] = customer.last_name
             data['first_name'] = customer.first_name
             data['phone_number'] = customer.phone
@@ -115,12 +116,15 @@ class HostViewSet(ModelViewSet):
             data['parking_space'] = customer.parking_space
             data['action'] = customer.dining_type.action_type
             data['timer'] = int((datetime.now() - customer.start_time).total_seconds())
+            data['assigned'] = customer.assigned
             answer = Message.objects.filter(store_id=store_id, table_id=customer.table_id, phone=customer.phone,
                                             item_title='', type=Message.ANSWER, is_seen=False).order_by('-created_at').first()
             if answer:
                 data['answer'] = answer.message
             else:
                 data['answer'] = ''
+            if not customer.phone:
+                data['answer'] = 'Please tell the customer verbally'
             question = Message.objects.filter(store_id=store_id, table_id=customer.table_id, phone=customer.phone,
                                               item_title='', type=Message.QUESTION, is_seen=False).order_by('-created_at').first()
             if question:

@@ -22,6 +22,10 @@ class Customer(models.Model):
     number_in_party = models.IntegerField(null=True, blank=True)
     dining_type = models.ForeignKey(DiningType, blank=True, null=True, on_delete=models.CASCADE)
     parking_space = models.CharField(max_length=25, default='', verbose_name="Parking Space #", blank=True)
+    assigned = models.BooleanField(default=False, verbose_name="True if a customer is assigned, not seated in Host Wait List")
+    assigned_table_id = models.CharField(max_length=25, null=True, blank=True)
+    waked = models.BooleanField(default=True)
+    seated = models.BooleanField(default=False)
 
     def full_name(self):
         return f"{self.first_name} {self.last_name}"

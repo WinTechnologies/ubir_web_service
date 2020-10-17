@@ -2,12 +2,15 @@ from datetime import datetime
 from rest_framework import serializers
 
 from .models import Store, ServiceItem, TableSeat
-
+from customer.models import Customer
+from .utils import rchop
 
 class TableSeatSerializer(serializers.ModelSerializer):
     location = serializers.SerializerMethodField()
     timer = serializers.SerializerMethodField()
-    last = serializers.SerializerMethodField()
+    last_name = serializers.SerializerMethodField()
+    phone = serializers.SerializerMethodField()
+    record_number = serializers.SerializerMethodField()
     seated = serializers.SerializerMethodField()
     ordered = serializers.SerializerMethodField()
 
@@ -36,11 +39,29 @@ class TableSeatSerializer(serializers.ModelSerializer):
         else:
             return ''
 
-    def get_last(self, obj):
-        if obj.last_time_customer_tap:
-            return int((datetime.now() - obj.last_time_customer_tap).total_seconds())
-        else:
-            return 0
+    def get_last_name(self, obj):
+        try:
+            customer = Customer.objects.get(store_id=rchop(obj.table_id, "." + obj.table_seat), table_id='wait_list',
+                                            assigned_table_id=obj.table_seat, assigned=True)
+            return customer.last_name
+        except Customer.DoesNotExist:
+            return ''
+
+    def get_phone(self, obj):
+        try:
+            customer = Customer.objects.get(store_id=rchop(obj.table_id, "." + obj.table_seat), table_id='wait_list',
+                                            assigned_table_id=obj.table_seat, assigned=True)
+            return customer.phone
+        except Customer.DoesNotExist:
+            return ''
+
+    def get_record_number(self, obj):
+        try:
+            customer = Customer.objects.get(store_id=rchop(obj.table_id, "." + obj.table_seat), table_id='wait_list',
+                                            assigned_table_id=obj.table_seat, assigned=True)
+            return customer.record_number
+        except Customer.DoesNotExist:
+            return ''
 
 
 class StoreSerializer(serializers.ModelSerializer):

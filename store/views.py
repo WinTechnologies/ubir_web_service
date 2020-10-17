@@ -140,8 +140,17 @@ class StoreViewSet(ModelViewSet):
         question = Message.objects.filter(store_id=store_id, table_id=table_id, phone=phone_number,
                                           item_title='', type=Message.QUESTION,
                                           is_seen=False).order_by('-created_at').first()
-        received_message = ''
-
+        answer = Message.objects.filter(store_id=store_id, table_id=table_id, phone=phone_number,
+                                        item_title='', type=Message.ANSWER,
+                                        is_seen=False).order_by('-created_at').first()
+        if question:
+            received_message = question.message
+        else:
+            received_message = ''
+        if answer:
+            sent_message = answer.message
+        else:
+            sent_message = ''
         store = Store.objects.get(store_id=store_id)
         location = customer.dining_type.title
         wait_time_frame = store.wait_time_frame
@@ -187,6 +196,9 @@ class StoreViewSet(ModelViewSet):
             "actual_wait": int((datetime.now() - customer.start_time).total_seconds()),
             "phone_number": phone_number,
             "received_message": received_message,
-            "parking_space": customer.parking_space
+            "sent_message": sent_message,
+            "parking_space": customer.parking_space,
+            "waked": customer.waked,
+            "assigned_table_id": customer.assigned_table_id
         }
         return Response(response, status=status.HTTP_200_OK)
