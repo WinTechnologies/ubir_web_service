@@ -190,7 +190,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 service_log.save()
                 customer = Customer.objects.get(phone=phone_number)
                 customer.is_in_store = False
+                customer.seated = False
+                customer.waked = True
+                customer.assigned = False
                 customer.save()
+                messages = Message.objects.filter(store_id=store_id, phone=phone_number, is_seen=False)
+                for message in messages:
+                    message.is_seen = True
+                    message.save()
             elif order.service_item.title == store.curside_message:
                 service_log = ServiceLog(company=store.company.name, store=store.name, login=serviceman.user.username,
                                          tap="Timer",
@@ -199,7 +206,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 service_log.save()
                 customer = Customer.objects.get(phone=phone_number)
                 customer.is_in_store = False
+                customer.seated = False
+                customer.waked = True
+                customer.assigned = False
                 customer.save()
+                messages = Message.objects.filter(store_id=store_id, phone=phone_number, is_seen=False)
+                for message in messages:
+                    message.is_seen = True
+                    message.save()
             else:
                 service_log = ServiceLog(company=store.company.name, store=store.name, login=serviceman.user.username,
                                          tap="Timer", content=f"{table_seat}|{quantity}|{convert(timer)}|{order.service_item.title}",
@@ -410,6 +424,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 table_seat = TableSeat.objects.get(table_seat=table_seat, table_id=store_id + '.' + table_seat)
                 table_seat.seated_time = None
                 table_seat.ordered_time = None
+                table_seat.action_status = TableSeat.AVAILABLE
                 table_seat.save()
                 response_data = {"message": "success", "store_id": store_id, "table_id": table_seat.table_seat}
             except:
@@ -629,6 +644,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
             table_seat = 'Wait'
             store = Store.objects.get(store_id=store_id)
             customer = Customer.objects.get(record_number=record_number)
+            customer.assigned = True
+            customer.save()
             service_item, created = ServiceItem.objects.get_or_create(title=service_item_title)
             try:
                 order = Order.objects.get(Q(store=store) & Q(table_id=table_seat) & Q(service_item=service_item) & (
@@ -652,8 +669,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
             order.save()
             data = OrderSerializer(instance=order).data
             data['timer'] = int((datetime.now() - order.start_time).total_seconds())
-            data['record_number'] = record_number
+            data['record_number'] = order.record_number
             data['phone_number'] = customer.phone
+            data['assigned'] = customer.assigned
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
@@ -669,6 +687,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
             table_seat = 'Wait'
             store = Store.objects.get(store_id=store_id)
             customer = Customer.objects.get(record_number=record_number)
+            customer.assigned = True
+            customer.save()
             service_item, created = ServiceItem.objects.get_or_create(title=service_item_title)
             try:
                 order = Order.objects.get(Q(store=store) & Q(table_id=table_seat) & Q(service_item=service_item) & (
@@ -692,8 +712,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
             order.save()
             data = OrderSerializer(instance=order).data
             data['timer'] = int((datetime.now() - order.start_time).total_seconds())
-            data['record_number'] = record_number
+            data['record_number'] = order.record_number
             data['phone_number'] = customer.phone
+            data['assigned'] = customer.assigned
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
