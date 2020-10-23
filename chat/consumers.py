@@ -123,18 +123,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
                                          content=f"{table_seat}|{order.quantity}|{convert(data['timer'])}|{order.service_item.title}",
                                          session_token=token)
                 service_log.save()
-            elif order.service_item.title == store.pickup_message:
-                service_log = ServiceLog(company=store.company.name, store=store.name, login=serviceman.user.username,
-                                         tap="Item",
-                                         content=f"{table_seat}|{order.quantity}|{convert(data['timer'])}|{order.service_item.title}",
-                                         session_token=token)
-                service_log.save()
-            elif order.service_item.title == store.curside_message:
-                service_log = ServiceLog(company=store.company.name, store=store.name, login=serviceman.user.username,
-                                         tap="Item",
-                                         content=f"{table_seat}|{order.quantity}|{convert(data['timer'])}|{order.service_item.title}",
-                                         session_token=token)
-                service_log.save()
             else:
                 service_log = ServiceLog(company=store.company.name, store=store.name, login=serviceman.user.username,
                                          tap="Item",
@@ -182,22 +170,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
                                          content=f"{table_seat}|{quantity}|{convert(timer)}|{order.service_item.title}",
                                          session_token=token)
                 service_log.save()
-            elif order.service_item.title == store.pickup_message:
-                service_log = ServiceLog(company=store.company.name, store=store.name, login=serviceman.user.username,
-                                         tap="Timer",
-                                         content=f"{table_seat}|{quantity}|{convert(timer)}|{order.service_item.title}",
-                                         session_token=token)
-                service_log.save()
-                customer = Customer.objects.get(phone=phone_number)
-                customer.is_in_store = False
-                customer.seated = False
-                customer.waked = True
-                customer.assigned = False
-                customer.save()
-                messages = Message.objects.filter(store_id=store_id, phone=phone_number, is_seen=False)
-                for message in messages:
-                    message.is_seen = True
-                    message.save()
             else:
                 service_log = ServiceLog(company=store.company.name, store=store.name, login=serviceman.user.username,
                                          tap="Timer", content=f"{table_seat}|{quantity}|{convert(timer)}|{order.service_item.title}",
