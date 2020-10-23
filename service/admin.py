@@ -15,6 +15,8 @@ from chat.consumers import ChatConsumer
 
 @admin.register(Serviceman)
 class ServiceAdmin(admin.ModelAdmin):
+    exclude = ['host', 'togo', 'curbside']
+
     list_display = (
         'user',
         'account_actions',

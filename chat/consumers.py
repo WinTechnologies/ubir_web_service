@@ -198,22 +198,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 for message in messages:
                     message.is_seen = True
                     message.save()
-            elif order.service_item.title == store.curside_message:
-                service_log = ServiceLog(company=store.company.name, store=store.name, login=serviceman.user.username,
-                                         tap="Timer",
-                                         content=f"{table_seat}|{quantity}|{convert(timer)}|{order.service_item.title}",
-                                         session_token=token)
-                service_log.save()
-                customer = Customer.objects.get(phone=phone_number)
-                customer.is_in_store = False
-                customer.seated = False
-                customer.waked = True
-                customer.assigned = False
-                customer.save()
-                messages = Message.objects.filter(store_id=store_id, phone=phone_number, is_seen=False)
-                for message in messages:
-                    message.is_seen = True
-                    message.save()
             else:
                 service_log = ServiceLog(company=store.company.name, store=store.name, login=serviceman.user.username,
                                          tap="Timer", content=f"{table_seat}|{quantity}|{convert(timer)}|{order.service_item.title}",
@@ -650,14 +634,19 @@ class ChatConsumer(AsyncWebsocketConsumer):
             try:
                 order = Order.objects.get(Q(store=store) & Q(table_id=table_seat) & Q(service_item=service_item) & (
                         Q(status=Order.INPROGRESS) | Q(status=Order.INPROGRESS_PENDING)))
-                order.status = Order.INPROGRESS_PENDING
+                # order.status = Order.INPROGRESS_PENDING
+                order.status = Order.COMPLETED
             except:
                 order = None
                 pass
+            # if not order:
+            #     order, created = Order.objects.get_or_create(table_id=table_seat, store=store,
+            #                                                  service_item=service_item,
+            #                                                  status=Order.PENDING, session_token=token)
             if not order:
                 order, created = Order.objects.get_or_create(table_id=table_seat, store=store,
                                                              service_item=service_item,
-                                                             status=Order.PENDING, session_token=token)
+                                                             status=Order.COMPLETED, session_token=token)
             order.quantity = 1
             order.table_id = table_seat
             order.customer = customer
@@ -676,6 +665,32 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 self.room_group_name,
                 {
                     'type': 'deliver_to_car',
+                    'message': data
+                }
+            )
+        elif data['command'] == 'complete_deliver_to_car':
+            store_id = data['store_id']
+            token = data['token']
+            record_number = data['record_number']
+            phone_number = data['phone_number']
+            customer = Customer.objects.get(record_number=record_number)
+            customer.is_in_store = False
+            customer.seated = False
+            customer.waked = True
+            customer.assigned = False
+            customer.save()
+            messages = Message.objects.filter(store_id=store_id, phone=phone_number, is_seen=False)
+            for message in messages:
+                message.is_seen = True
+                message.save()
+            data = {}
+            data['record_number'] = record_number
+            data['phone_number'] = phone_number
+            data['store_id'] = store_id
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'complete_deliver_to_car',
                     'message': data
                 }
             )
@@ -719,6 +734,32 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 self.room_group_name,
                 {
                     'type': 'pickup_bar',
+                    'message': data
+                }
+            )
+        elif data['command'] == 'complete_pickup_bar':
+            store_id = data['store_id']
+            token = data['token']
+            record_number = data['record_number']
+            phone_number = data['phone_number']
+            customer = Customer.objects.get(record_number=record_number)
+            customer.is_in_store = False
+            customer.seated = False
+            customer.waked = True
+            customer.assigned = False
+            customer.save()
+            messages = Message.objects.filter(store_id=store_id, phone=phone_number, is_seen=False)
+            for message in messages:
+                message.is_seen = True
+                message.save()
+            data = {}
+            data['record_number'] = record_number
+            data['phone_number'] = phone_number
+            data['store_id'] = store_id
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'complete_pickup_bar',
                     'message': data
                 }
             )
@@ -884,11 +925,25 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'command': 'set_deliver_to_car'
         }))
 
+    async def complete_deliver_to_car(self, data):
+        message = data['message']
+        await self.send(text_data=json.dumps({
+            'message': message,
+            'command': 'set_complete_deliver_to_car'
+        }))
+
     async def pickup_bar(self, data):
         message = data['message']
         await self.send(text_data=json.dumps({
             'message': message,
             'command': 'set_pickup_bar'
+        }))
+
+    async def complete_pickup_bar(self, data):
+        message = data['message']
+        await self.send(text_data=json.dumps({
+            'message': message,
+            'command': 'set_complete_pickup_bar'
         }))
 
     async def logout_host(self, data):

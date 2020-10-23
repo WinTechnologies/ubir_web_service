@@ -5,10 +5,12 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from rest_framework.decorators import action
 from phone_verify.base import response
+from rest_framework.authtoken.models import Token
 
 from users.permissions import IsServiceman
 from customer.models import Customer
-from store.models import Store, TableSeat
+from store.models import Store, TableSeat, DiningType
+from service.models import Serviceman
 from chat.models import Message
 from .utils import SMSTextSender
 from customer.serializers import CustomerSerializer
@@ -102,8 +104,22 @@ class HostViewSet(ModelViewSet):
 
     @action(detail=False, methods=['post'], permission_classes=[IsServiceman], url_path='get_wait_list')
     def get_wait_list(self, request):
+        token = request.data['token']
         store_id = request.data['store_id']
-        customers = Customer.objects.filter(store_id=store_id, table_id='wait_list', is_in_store=True, seated=False)
+        token = Token.objects.get(key=token)
+        serviceman = Serviceman.objects.get(user=token.user)
+        dining_types = []
+        for dining_type in DiningType.objects.all():
+            if dining_type.action_type == 'Pickup @ Bar':
+                if serviceman.togo:
+                    dining_types.append(dining_type.title)
+            elif dining_type.action_type == 'Delivering to Car/Curbside':
+                if serviceman.curbside:
+                    dining_types.append(dining_type.title)
+            else:
+                if serviceman.host:
+                    dining_types.append(dining_type.title)
+        customers = Customer.objects.filter(store_id=store_id, table_id='wait_list', is_in_store=True, seated=False, dining_type__title__in=dining_types)
         response_data = []
         for customer in customers:
             data = {}
@@ -146,9 +162,17 @@ class HostViewSet(ModelViewSet):
 
     @action(detail=False, methods=['post'], permission_classes=[IsServiceman], url_path='get_store_configuration')
     def get_store_configuration(self, request):
+        token = request.data['token']
         store_id = request.data['store_id']
+        token = Token.objects.get(key=token)
+        serviceman = Serviceman.objects.get(user=token.user)
         store = Store.objects.get(store_id=store_id)
-        return Response(StoreSerializer(instance=store).data, status=status.HTTP_200_OK)
+        data = {}
+        data["store_config"] = StoreSerializer(instance=store).data
+        data["host"] = serviceman.host
+        data["togo"] = serviceman.togo
+        data["curbside"] = serviceman.curbside
+        return Response(data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['post'], permission_classes=[IsServiceman], url_path='send_sms_text')
     def send_sms_text(self, request):
@@ -163,3 +187,23 @@ class HostViewSet(ModelViewSet):
             return response.Ok({"message": "Success"})
         except:
             return response.Ok({"message": "Failed"})
+
+    @action(detail=False, methods=['post'], permission_classes=[IsServiceman], url_path='select_dining_option')
+    def select_dining_option(self, request):
+        token = request.data['token']
+        type = request.data['type']
+        token = Token.objects.get(key=token)
+        serviceman = Serviceman.objects.get(user=token.user)
+        if type == 'host':
+            serviceman.host = not serviceman.host
+        elif type == 'togo':
+            serviceman.togo = not serviceman.togo
+        elif type == 'curbside':
+            serviceman.curbside = not serviceman.curbside
+        serviceman.save()
+        data = {
+            "host": serviceman.host,
+            "togo": serviceman.togo,
+            "curbside": serviceman.curbside
+        }
+        return Response(data, status=status.HTTP_200_OK)

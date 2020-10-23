@@ -10,6 +10,9 @@ class Serviceman(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True)
     store = models.ForeignKey(Store, on_delete=models.CASCADE)
     active = models.BooleanField(default=False)
+    host = models.BooleanField(default=True)
+    togo = models.BooleanField(default=True)
+    curbside = models.BooleanField(default=True)
 
     class Meta:
         verbose_name = _('Staff')
