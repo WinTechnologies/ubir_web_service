@@ -189,6 +189,8 @@ class StoreViewSet(ModelViewSet):
         customer = Customer.objects.get(phone=phone_number)
         response = {
             "full_name": customer.full_name(),
+            "first_name": customer.first_name,
+            "last_name": customer.last_name,
             "number_in_party": customer.number_in_party,
             "dining_type": customer.dining_type.title,
             "longest_wait": longest,

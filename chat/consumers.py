@@ -761,8 +761,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
             response_data['last_name'] = customer.last_name
             response_data['first_name'] = customer.first_name
             response_data['phone_number'] = customer.phone
-            response_data['party_size'] = customer.number_in_party
-            response_data['dining_option'] = customer.dining_type.title
+            response_data['number_in_party'] = customer.number_in_party
+            response_data['dining_type'] = customer.dining_type.title
             response_data['parking_space'] = customer.parking_space
             response_data['action'] = customer.dining_type.action_type
             response_data['timer'] = int((datetime.now() - customer.start_time).total_seconds())
@@ -771,6 +771,64 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 self.room_group_name,
                 {
                     'type': 'set_wait_list',
+                    'message': response_data
+                }
+            )
+        elif data['command'] == 'remove_customer':
+            record_number = data['record_number']
+            store_id = data['store_id']
+            company_id = data['company_id']
+            customer = Customer.objects.get(company_id=company_id, store_id=store_id, record_number=record_number)
+            customer.is_in_store = False
+            customer.seated = False
+            customer.waked = True
+            customer.assigned = False
+            customer.save()
+            customer_phone = customer.phone if customer.phone else ''
+            messages = Message.objects.filter(store_id=store_id, phone=customer_phone, is_seen=False)
+            for message in messages:
+                message.is_seen = True
+                message.save()
+            response_data = {
+                "record_number": record_number,
+                "phone_number": customer_phone,
+                "store_id": store_id,
+                "company_id": company_id
+            }
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'remove_customer',
+                    'message': response_data
+                }
+            )
+        elif data['command'] == 'edit_customer':
+            record_number = data['record_number']
+            store_id = data['store_id']
+            company_id = data['company_id']
+            customer = Customer.objects.get(company_id=company_id, store_id=store_id, record_number=record_number)
+            customer.first_name = data['first_name']
+            customer.last_name = data['last_name']
+            customer.number_in_party = data['number_in_party']
+            dining_type = DiningType.objects.get(title=data['dining_type'])
+            customer.dining_type = dining_type
+            customer.save()
+            customer_phone = customer.phone if customer.phone else ''
+            response_data = {
+                "record_number": record_number,
+                "phone_number": customer_phone,
+                "store_id": store_id,
+                "company_id": company_id,
+                "first_name": customer.first_name,
+                "last_name": customer.last_name,
+                "full_name": customer.full_name(),
+                "number_in_party": customer.number_in_party,
+                "dining_type": customer.dining_type.title,
+            }
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'edit_customer',
                     'message': response_data
                 }
             )
@@ -937,4 +995,18 @@ class ChatConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             'message': message,
             'command': 'set_login_table'
+        }))
+
+    async def remove_customer(self, data):
+        message = data['message']
+        await self.send(text_data=json.dumps({
+            'message': message,
+            'command': 'set_remove_customer'
+        }))
+
+    async def edit_customer(self, data):
+        message = data['message']
+        await self.send(text_data=json.dumps({
+            'message': message,
+            'command': 'set_edit_customer'
         }))

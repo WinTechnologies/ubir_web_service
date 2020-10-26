@@ -156,12 +156,39 @@ class CustomVerificationViewSet(VerificationViewSet):
                 return response.Ok({"error": "This phone number is already logged in this company/store."})
         except Customer.DoesNotExist:
             pass
-        serializer = PhoneSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        session_token = send_security_code_and_generate_session_token(
-            str(serializer.validated_data["phone_number"])
-        )
-        return response.Ok({"session_token": session_token, "is_authenticated": False})
+        if is_specific_phone_number:
+            first_name = request.data['first_name']
+            last_name = request.data['last_name']
+            number_in_party = request.data['number_in_party']
+            selected_dining_type = request.data['selected_dining_type']
+            parking_space = request.data['parking_space']
+            try:
+                customer = Customer.objects.get(phone=phone_number_without_code)
+            except:
+                customer = Customer(phone=phone_number_without_code)
+            customer.company_id = company_id
+            customer.store_id = store_id
+            customer.table_id = table_id
+            customer.first_name = first_name
+            customer.last_name = last_name
+            if isinstance(number_in_party, int):
+                customer.number_in_party = number_in_party
+            dining_type = DiningType.objects.get(title=selected_dining_type)
+            customer.dining_type = dining_type
+            customer.parking_space = parking_space
+            customer.is_in_store = True
+            customer.start_time = datetime.now()
+            session_token = "".join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(25))
+            customer.session_token = session_token
+            customer.save()
+            return response.Ok({"session_token": session_token, "is_authenticated": True})
+        else:
+            serializer = PhoneSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            session_token = send_security_code_and_generate_session_token(
+                str(serializer.validated_data["phone_number"])
+            )
+            return response.Ok({"session_token": session_token, "is_authenticated": False})
 
     @action(
         detail=False,
@@ -185,8 +212,7 @@ class CustomVerificationViewSet(VerificationViewSet):
         customer.table_id = table_id
         customer.is_in_store = True
         customer.session_token = request.data['session_token']
-        table_seat = TableSeat.objects.get(table_id=store_id + '.' + table_id,
-                                           table_seat=table_id)
+        table_seat = TableSeat.objects.get(table_id=store_id + '.' + table_id, table_seat=table_id)
         table_seat.last_time_status_changed = datetime.now()
         table_seat.seated_time = datetime.now()
         table_seat.last_time_customer_tap = datetime.now()
@@ -222,7 +248,8 @@ class CustomVerificationViewSet(VerificationViewSet):
         customer.table_id = table_id
         customer.first_name = first_name
         customer.last_name = last_name
-        customer.number_in_party = number_in_party
+        if isinstance(number_in_party, int):
+            customer.number_in_party = number_in_party
         dining_type = DiningType.objects.get(title=selected_dining_type)
         customer.dining_type = dining_type
         customer.parking_space = parking_space

@@ -127,8 +127,8 @@ class HostViewSet(ModelViewSet):
             data['last_name'] = customer.last_name
             data['first_name'] = customer.first_name
             data['phone_number'] = customer.phone
-            data['party_size'] = customer.number_in_party
-            data['dining_option'] = customer.dining_type.title
+            data['number_in_party'] = customer.number_in_party
+            data['dining_type'] = customer.dining_type.title
             data['parking_space'] = customer.parking_space
             data['action'] = customer.dining_type.action_type
             data['timer'] = int((datetime.now() - customer.start_time).total_seconds())
