@@ -1,5 +1,6 @@
 # chat/consumers.py
 import json
+import pytz
 import random
 import string
 
@@ -76,18 +77,18 @@ class ChatConsumer(AsyncWebsocketConsumer):
             order.quantity = order.quantity + 1
             order.table_id = table_id
             if created:
-                order.start_time = datetime.now()
+                order.start_time = datetime.now(pytz.timezone(store.timezone))
             else:
                 if order.status == Order.COMPLETED:
-                    order.start_time = datetime.now()
+                    order.start_time = datetime.now(pytz.timezone(store.timezone))
             order.save()
             # Save the last time the customer taps the item
             table_seat = TableSeat.objects.get(table_id=store_id + "." + table_id, table_seat=table_id)
-            table_seat.last_time_customer_tap = datetime.now()
+            table_seat.last_time_customer_tap = datetime.now(pytz.timezone(store.timezone))
             table_seat.save()
             data = OrderSerializer(instance=order).data
-            data['timer'] = int((datetime.now() - order.start_time).total_seconds())
-            data['last'] = int((datetime.now() - table_seat.last_time_customer_tap).total_seconds())
+            data['timer'] = int((datetime.now(pytz.timezone(store.timezone)) - order.start_time).total_seconds())
+            data['last'] = int((datetime.now(pytz.timezone(store.timezone)) - table_seat.last_time_customer_tap).total_seconds())
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
@@ -108,14 +109,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
             order.status = Order.INPROGRESS
             order.save()
             data = OrderSerializer(instance=order).data
-            data['timer'] = int((datetime.now() - order.start_time).total_seconds())
+            data['timer'] = int((datetime.now(pytz.timezone(store.timezone)) - order.start_time).total_seconds())
             data['phone_number'] = phone_number
             # The Serviceman taps 'Clean & Disinfect Table' item
             if order.service_item.title == 'Clean & Disinfect Table':
                 table_seat = TableSeat.objects.get(table_seat=table_seat,
                                                    table_id=store.store_id + '.' + table_seat)
                 table_seat.action_status = TableSeat.CLEANING
-                table_seat.last_time_status_changed = datetime.now()
+                table_seat.last_time_status_changed = datetime.now(pytz.timezone(store.timezone))
                 table_seat.save()
                 data['table_status'] = TableSeat.CLEANING
                 service_log = ServiceLog(company=store.company.name, store=store.name, login=serviceman.user.username,
@@ -153,7 +154,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             store = Store.objects.get(store_id=store_id)
             token = Token.objects.get(key=token)
             serviceman = Serviceman.objects.get(user=token.user)
-            timer = int((datetime.now() - order.start_time).total_seconds())
+            timer = int((datetime.now(pytz.timezone(store.timezone)) - order.start_time).total_seconds())
             if order.service_item.title == 'Clean & Disinfect Table':
                 table_seat = TableSeat.objects.get(table_seat=table_seat,
                                                    table_id=store.store_id + '.' + table_seat)
@@ -162,7 +163,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     table_seat.action_status = TableSeat.OCCUPIED
                 else:
                     table_seat.action_status = TableSeat.AVAILABLE
-                table_seat.last_time_status_changed = datetime.now()
+                table_seat.last_time_status_changed = datetime.now(pytz.timezone(store.timezone))
                 table_seat.save()
                 data['table_status'] = table_seat.action_status
                 service_log = ServiceLog(company=store.company.name, store=store.name, login=serviceman.user.username,
@@ -198,7 +199,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             token = Token.objects.get(key=token)
             serviceman = Serviceman.objects.get(user=token.user)
             order = Order.objects.get(record_number=record_number)
-            timer = int((datetime.now() - order.start_time).total_seconds())
+            timer = int((datetime.now(pytz.timezone(store.timezone)) - order.start_time).total_seconds())
             message, created = Message.objects.get_or_create(table_id=table_seat,
                                                              store_id=store_id,
                                                              item_title=item_title,
@@ -241,7 +242,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             message.save()
             data = MessageSerializer(instance=message).data
             order = Order.objects.get(Q(customer=customer) & Q(store=store) & Q(service_item__title=item_title) & Q(table_id=table_seat) & ~Q(status=Order.COMPLETED))
-            timer = int((datetime.now() - order.start_time).total_seconds())
+            timer = int((datetime.now(pytz.timezone(store.timezone)) - order.start_time).total_seconds())
             customer_log = CustomerLog(company=store.company.name, store=store.name, login=phone_number,
                                        tap="Message", content=f"{table_seat}|{order.record_number}|{order.service_item.title}|{order.quantity}|{convert(timer)}|{message_text}",
                                        session_token=session_token)
@@ -354,6 +355,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
             token = data['token']
             table_seat = data['table_seat']
             store_id = data['store_id']
+            service_item_title = data['service_item_title']
+            service_item, created = ServiceItem.objects.get_or_create(title=service_item_title)
             token = Token.objects.get(key=token)
             serviceman = Serviceman.objects.get(user=token.user)
             try:
@@ -368,7 +371,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                         customer.save()
                 except:
                     pass
-                orders = Order.objects.filter(store__store_id=store_id, table_id=table_seat)
+                orders = Order.objects.filter(store__store_id=store_id, table_id=table_seat).exclude(service_item=service_item)
                 phone_numbers = []
                 for order in orders:
                     order.status = Order.COMPLETED
@@ -407,7 +410,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                              "last_name": customer.last_name,
                              "table_seat": table_seat,
                              "store_id": store_id,
-                             "message": "Your table is ready",
+                             "message": "Your Table is ready, Please proceed to the Host Stand to be seated.",
                              "assigned": True}
             await self.channel_layer.group_send(self.room_group_name,
                                                 {'type': 'assign_table', 'message': response_data})
@@ -415,6 +418,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             table_seat = data['table_seat']
             store_id = data['store_id']
             record_number = data["record_number"]
+            store = Store.objects.get(store_id=store_id)
             response_data = {}
             customer = Customer.objects.get(record_number=record_number)
             customer.store_id = store_id
@@ -436,8 +440,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     pass
             table_seat = TableSeat.objects.get(table_seat=table_seat, table_id=store_id + '.' + table_seat)
             table_seat.action_status = TableSeat.OCCUPIED
-            table_seat.last_time_status_changed = datetime.now()
-            table_seat.seated_time = datetime.now()
+            table_seat.last_time_status_changed = datetime.now(pytz.timezone(store.timezone))
+            table_seat.seated_time = datetime.now(pytz.timezone(store.timezone))
             table_seat.save()
             messages = Message.objects.filter(store_id=store_id, table_id='wait_list', phone=customer.phone, is_seen=False)
             for message in messages:
@@ -448,6 +452,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                              "session_token": session_token,
                              "record_number": record_number,
                              "phone_number": customer.phone,
+                             "last_name": customer.last_name,
                              "table_seat": table_seat.table_seat,
                              "store_id": store_id,
                              "table_status": table_seat.action_status,
@@ -460,6 +465,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             table_seat = data['table_seat']
             store_id = data['store_id']
             phone_number = data["phone_number"]
+            store = Store.objects.get(store_id=store_id)
             response_data = {}
             customer = Customer.objects.get(phone=phone_number)
             customer.store_id = store_id
@@ -473,8 +479,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
             customer.save()
             table_seat = TableSeat.objects.get(table_seat=table_seat, table_id=store_id + '.' + table_seat)
             table_seat.action_status = TableSeat.OCCUPIED
-            table_seat.last_time_status_changed = datetime.now()
-            table_seat.seated_time = datetime.now()
+            table_seat.last_time_status_changed = datetime.now(pytz.timezone(store.timezone))
+            table_seat.seated_time = datetime.now(pytz.timezone(store.timezone))
             table_seat.save()
             messages = Message.objects.filter(store_id=store_id, table_id='wait_list', phone=customer.phone, is_seen=False)
             for message in messages:
@@ -512,13 +518,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
             order.quantity = 1
             order.table_id = table_seat
             if created:
-                order.start_time = datetime.now()
+                order.start_time = datetime.now(pytz.timezone(store.timezone))
             else:
                 if order.status == Order.COMPLETED:
-                    order.start_time = datetime.now()
+                    order.start_time = datetime.now(pytz.timezone(store.timezone))
             order.save()
             data = OrderSerializer(instance=order).data
-            data['timer'] = int((datetime.now() - order.start_time).total_seconds())
+            data['timer'] = int((datetime.now(pytz.timezone(store.timezone)) - order.start_time).total_seconds())
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
@@ -532,11 +538,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
             store_id = data['store_id']
             token = data['token']
             customer = Customer.objects.get(phone=phone_number)
-            messages = Message.objects.filter(store_id=store_id, table_id='wait_list', phone=phone_number,
-                                              is_seen=False)
-            for message in messages:
-                message.is_seen = True
-                message.save()
+            # messages = Message.objects.filter(store_id=store_id, table_id='wait_list', phone=phone_number,
+            #                                   is_seen=False)
+            # for message in messages:
+            #     message.is_seen = True
+            #     message.save()
             message, created = Message.objects.get_or_create(table_id=customer.table_id,
                                                              store_id=store_id,
                                                              item_title='',
@@ -623,13 +629,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
             order.table_id = table_seat
             order.customer = customer
             if created:
-                order.start_time = datetime.now()
+                order.start_time = datetime.now(pytz.timezone(store.timezone))
             else:
                 if order.status == Order.COMPLETED:
-                    order.start_time = datetime.now()
+                    order.start_time = datetime.now(pytz.timezone(store.timezone))
             order.save()
             data = OrderSerializer(instance=order).data
-            data['timer'] = int((datetime.now() - order.start_time).total_seconds())
+            data['timer'] = int((datetime.now(pytz.timezone(store.timezone)) - order.start_time).total_seconds())
             data['record_number'] = order.record_number
             data['phone_number'] = customer.phone
             data['assigned'] = customer.assigned
@@ -692,13 +698,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
             order.table_id = table_seat
             order.customer = customer
             if created:
-                order.start_time = datetime.now()
+                order.start_time = datetime.now(pytz.timezone(store.timezone))
             else:
                 if order.status == Order.COMPLETED:
-                    order.start_time = datetime.now()
+                    order.start_time = datetime.now(pytz.timezone(store.timezone))
             order.save()
             data = OrderSerializer(instance=order).data
-            data['timer'] = int((datetime.now() - order.start_time).total_seconds())
+            data['timer'] = int((datetime.now(pytz.timezone(store.timezone)) - order.start_time).total_seconds())
             data['record_number'] = order.record_number
             data['phone_number'] = customer.phone
             data['assigned'] = customer.assigned
@@ -742,6 +748,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             last_name = data['last_name']
             number_in_party = data['number_in_party']
             dining_type = data['dining_type']
+            store = Store.objects.get(store_id=store_id)
             customer = Customer(last_name=last_name)
             customer.phone = ''
             customer.company_id = company_id
@@ -752,7 +759,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             dining_type = DiningType.objects.get(title=dining_type)
             customer.dining_type = dining_type
             customer.is_in_store = True
-            customer.start_time = datetime.now()
+            customer.start_time = datetime.now(pytz.timezone(store.timezone))
             customer.save()
             response_data = {}
             response_data['record_number'] = customer.record_number
@@ -765,7 +772,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             response_data['dining_type'] = customer.dining_type.title
             response_data['parking_space'] = customer.parking_space
             response_data['action'] = customer.dining_type.action_type
-            response_data['timer'] = int((datetime.now() - customer.start_time).total_seconds())
+            response_data['timer'] = int((datetime.now(pytz.timezone(store.timezone)) - customer.start_time).total_seconds())
             response_data['answer'] = 'Please tell the customer verbally'
             await self.channel_layer.group_send(
                 self.room_group_name,

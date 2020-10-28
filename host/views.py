@@ -1,3 +1,4 @@
+import pytz
 from datetime import datetime, timezone, timedelta
 from rest_framework.viewsets import ModelViewSet
 from rest_framework import status
@@ -13,6 +14,7 @@ from store.models import Store, TableSeat, DiningType
 from service.models import Serviceman
 from chat.models import Message
 from .utils import SMSTextSender
+from chat.serializers import MessageSerializer
 from customer.serializers import CustomerSerializer
 from store.serializers import TableSeatSerializer, StoreSerializer
 
@@ -77,7 +79,7 @@ class HostViewSet(ModelViewSet):
                                                 table_id='wait_list',
                                                 is_in_store=True,
                                                 dining_type__title__iexact=location,
-                                                start_time__gte=datetime.now() - timedelta(
+                                                start_time__gte=datetime.now(pytz.timezone(store.timezone)) - timedelta(
                                                     minutes=wait_time_frame))
             if len(customers) == 0:
                 customer = Customer.objects.filter(store_id=store_id,
@@ -85,8 +87,8 @@ class HostViewSet(ModelViewSet):
                                                    is_in_store=True,
                                                    dining_type__title__iexact=location).order_by('-start_time').first()
                 if customer:
-                    data['longest'] = int((datetime.now() - customer.start_time).total_seconds())
-                    data['average'] = int((datetime.now() - customer.start_time).total_seconds())
+                    data['longest'] = int((datetime.now(pytz.timezone(store.timezone)) - customer.start_time).total_seconds())
+                    data['average'] = int((datetime.now(pytz.timezone(store.timezone)) - customer.start_time).total_seconds())
                 else:
                     data['longest'] = 0
                     data['average'] = 0
@@ -94,9 +96,9 @@ class HostViewSet(ModelViewSet):
                 sum = 0
                 longest = 0
                 for customer in customers:
-                    sum += (datetime.now() - customer.start_time).total_seconds()
-                    if longest < (datetime.now() - customer.start_time).total_seconds():
-                        longest = (datetime.now() - customer.start_time).total_seconds()
+                    sum += (datetime.now(pytz.timezone(store.timezone)) - customer.start_time).total_seconds()
+                    if longest < (datetime.now(pytz.timezone(store.timezone)) - customer.start_time).total_seconds():
+                        longest = (datetime.now(pytz.timezone(store.timezone)) - customer.start_time).total_seconds()
                 data['longest'] = int(longest)
                 data['average'] = int(sum / len(customers))
             response_data.append(data)
@@ -106,6 +108,7 @@ class HostViewSet(ModelViewSet):
     def get_wait_list(self, request):
         token = request.data['token']
         store_id = request.data['store_id']
+        store = Store.objects.get(store_id=store_id)
         token = Token.objects.get(key=token)
         serviceman = Serviceman.objects.get(user=token.user)
         dining_types = []
@@ -121,8 +124,10 @@ class HostViewSet(ModelViewSet):
                     dining_types.append(dining_type.title)
         customers = Customer.objects.filter(store_id=store_id, table_id='wait_list', is_in_store=True, seated=False, dining_type__title__in=dining_types)
         response_data = []
+        unique_number = 0
         for customer in customers:
             data = {}
+            data['id'] = unique_number
             data['record_number'] = customer.record_number
             data['last_name'] = customer.last_name
             data['first_name'] = customer.first_name
@@ -131,7 +136,7 @@ class HostViewSet(ModelViewSet):
             data['dining_type'] = customer.dining_type.title
             data['parking_space'] = customer.parking_space
             data['action'] = customer.dining_type.action_type
-            data['timer'] = int((datetime.now() - customer.start_time).total_seconds())
+            data['timer'] = int((datetime.now(pytz.timezone(store.timezone)) - customer.start_time).total_seconds())
             data['assigned'] = customer.assigned
             answer = Message.objects.filter(store_id=store_id, table_id=customer.table_id, phone=customer.phone,
                                             item_title='', type=Message.ANSWER, is_seen=False).order_by('-created_at').first()
@@ -148,6 +153,7 @@ class HostViewSet(ModelViewSet):
             else:
                 data['question'] = ''
             response_data.append(data)
+            unique_number += 1
         return Response(response_data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['post'], permission_classes=[IsServiceman], url_path='get_store_table_config')
@@ -207,3 +213,11 @@ class HostViewSet(ModelViewSet):
             "curbside": serviceman.curbside
         }
         return Response(data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['post'], permission_classes=[IsServiceman], url_path='get_message_history')
+    def get_message_history(self, request):
+        token = request.data['token']
+        store_id = request.data['store_id']
+        phone_number = request.data['phone_number']
+        messages = Message.objects.filter(store_id=store_id, table_id='wait_list', phone=phone_number, is_seen=False).order_by("created_at")
+        return Response(MessageSerializer(messages, many=True).data, status=status.HTTP_200_OK)

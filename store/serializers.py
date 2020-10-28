@@ -1,3 +1,4 @@
+import pytz
 from datetime import datetime
 from rest_framework import serializers
 
@@ -11,8 +12,9 @@ class TableSeatSerializer(serializers.ModelSerializer):
     last_name = serializers.SerializerMethodField()
     phone = serializers.SerializerMethodField()
     record_number = serializers.SerializerMethodField()
-    seated = serializers.SerializerMethodField()
+    seated_time = serializers.SerializerMethodField()
     ordered = serializers.SerializerMethodField()
+    seated = serializers.SerializerMethodField()
 
     class Meta:
         model = TableSeat
@@ -22,12 +24,14 @@ class TableSeatSerializer(serializers.ModelSerializer):
         return obj.location.title
 
     def get_timer(self, obj):
+        store_id = rchop(obj.table_id, "." + obj.table_seat)
+        store = Store.objects.get(store_id=store_id)
         if obj.last_time_status_changed:
-            return int((datetime.now() - obj.last_time_status_changed).total_seconds())
+            return int((datetime.now(pytz.timezone(store.timezone)) - obj.last_time_status_changed).total_seconds())
         else:
             return 0
 
-    def get_seated(self, obj):
+    def get_seated_time(self, obj):
         if obj.seated_time:
             return obj.seated_time.strftime("%H:%M %p")
         else:
@@ -43,9 +47,29 @@ class TableSeatSerializer(serializers.ModelSerializer):
         try:
             customer = Customer.objects.get(store_id=rchop(obj.table_id, "." + obj.table_seat), table_id='wait_list',
                                             assigned_table_id=obj.table_seat, assigned=True)
-            return customer.last_name
+            customer_name = customer.last_name
         except Customer.DoesNotExist:
-            return ''
+            customer_name = ''
+        try:
+            customer = Customer.objects.get(store_id=rchop(obj.table_id, "." + obj.table_seat), table_id=obj.table_seat, seated=True, is_in_store=True)
+            customer_name = customer.last_name
+        except Customer.DoesNotExist:
+            customer_name = ''
+        return customer_name
+
+    def get_seated(self, obj):
+        try:
+            customer = Customer.objects.get(store_id=rchop(obj.table_id, "." + obj.table_seat), table_id='wait_list',
+                                            assigned_table_id=obj.table_seat, assigned=True)
+            customer_name = customer.seated
+        except Customer.DoesNotExist:
+            customer_name = False
+        try:
+            customer = Customer.objects.get(store_id=rchop(obj.table_id, "." + obj.table_seat), table_id=obj.table_seat, seated=True, is_in_store=True)
+            customer_name = customer.seated
+        except Customer.DoesNotExist:
+            customer_name = False
+        return customer_name
 
     def get_phone(self, obj):
         try:

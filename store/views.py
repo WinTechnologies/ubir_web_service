@@ -1,3 +1,4 @@
+import pytz
 from datetime import datetime, timedelta
 from rest_framework.viewsets import ModelViewSet
 from rest_framework import status
@@ -41,7 +42,7 @@ class StoreViewSet(ModelViewSet):
                     order = Order.objects.filter(customer=customer, store=store, service_item=service_item, table_id=table_id).exclude(status=Order.COMPLETED).first()
                     data['quantity'] = order.quantity
                     data['status'] = order.status
-                    data['timer'] = int((datetime.now() - order.start_time).total_seconds())
+                    data['timer'] = int((datetime.now(pytz.timezone(store.timezone)) - order.start_time).total_seconds())
                 except:
                     data['quantity'] = 0
                     data['timer'] = 0
@@ -164,7 +165,7 @@ class StoreViewSet(ModelViewSet):
                                             table_id='wait_list',
                                             is_in_store=True,
                                             dining_type__title__iexact=location,
-                                            start_time__gte=datetime.now() - timedelta(
+                                            start_time__gte=datetime.now(pytz.timezone(store.timezone)) - timedelta(
                                                 minutes=wait_time_frame))
         if len(customers) == 0:
             customer = Customer.objects.filter(store_id=store_id,
@@ -172,8 +173,8 @@ class StoreViewSet(ModelViewSet):
                                                is_in_store=True,
                                                dining_type__title__iexact=location).order_by('-start_time').first()
             if customer:
-                longest = int((datetime.now() - customer.start_time).total_seconds())
-                average = int((datetime.now() - customer.start_time).total_seconds())
+                longest = int((datetime.now(pytz.timezone(store.timezone)) - customer.start_time).total_seconds())
+                average = int((datetime.now(pytz.timezone(store.timezone)) - customer.start_time).total_seconds())
             else:
                 longest = 0
                 average = 0
@@ -181,9 +182,9 @@ class StoreViewSet(ModelViewSet):
             sum = 0
             longest = 0
             for customer in customers:
-                sum += (datetime.now() - customer.start_time).total_seconds()
-                if longest < (datetime.now() - customer.start_time).total_seconds():
-                    longest = (datetime.now() - customer.start_time).total_seconds()
+                sum += (datetime.now(pytz.timezone(store.timezone)) - customer.start_time).total_seconds()
+                if longest < (datetime.now(pytz.timezone(store.timezone)) - customer.start_time).total_seconds():
+                    longest = (datetime.now(pytz.timezone(store.timezone)) - customer.start_time).total_seconds()
                     longest = int(longest)
             average = int(sum / len(customers))
         customer = Customer.objects.get(phone=phone_number)
@@ -195,7 +196,7 @@ class StoreViewSet(ModelViewSet):
             "dining_type": customer.dining_type.title,
             "longest_wait": longest,
             "average_wait": average,
-            "actual_wait": int((datetime.now() - customer.start_time).total_seconds()),
+            "actual_wait": int((datetime.now(pytz.timezone(store.timezone)) - customer.start_time).total_seconds()),
             "phone_number": phone_number,
             "received_message": received_message,
             "sent_message": sent_message,

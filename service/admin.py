@@ -4,6 +4,8 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.urls import reverse_lazy, path, re_path
 from django.http import HttpResponseRedirect
+from rest_framework.authtoken.models import Token
+
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
@@ -33,11 +35,15 @@ class ServiceAdmin(admin.ModelAdmin):
         serviceman = Serviceman.objects.get(pk=account_id)
         channel_layer = get_channel_layer()
         room_group_name = 'chat_%s' % serviceman.store.store_id
+        token = Token.objects.get(user=serviceman.user).key
+        response_data = {
+            'token': token
+        }
         async_to_sync(channel_layer.group_send)(
             room_group_name,
             {
                 'type': 'logout_host',
-                'message': True
+                'message': response_data
             }
         )
         url = '/admin/service/serviceman'

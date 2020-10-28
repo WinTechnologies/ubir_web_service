@@ -1,3 +1,4 @@
+import pytz
 from datetime import datetime
 from rest_framework import status
 from rest_framework.viewsets import ModelViewSet
@@ -107,7 +108,7 @@ class ServiceViewSet(ModelViewSet):
             response_data = []
             for order in orders:
                 data = OrderSerializer(instance=order).data
-                data['timer'] = int((datetime.now() - order.start_time).total_seconds())
+                data['timer'] = int((datetime.now(pytz.timezone(serviceman.store.timezone)) - order.start_time).total_seconds())
                 response_data.append(data)
             return Response(response_data, status=status.HTTP_200_OK)
         except Exception as e:

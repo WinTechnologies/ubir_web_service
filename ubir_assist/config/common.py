@@ -80,7 +80,7 @@ class Common(Configuration):
     # to load the internationalization machinery.
     USE_I18N = False
     USE_L10N = True
-    USE_TZ = False
+    USE_TZ = True
     LOGIN_REDIRECT_URL = '/'
 
     # Static files (CSS, JavaScript, Images)

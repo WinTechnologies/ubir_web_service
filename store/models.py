@@ -1,3 +1,5 @@
+import pytz
+import django.utils.timezone
 from datetime import datetime
 from django.db import models
 from django.db.models.signals import post_save
@@ -5,6 +7,8 @@ from django_better_admin_arrayfield.models.fields import ArrayField
 
 from django.dispatch import receiver
 from django.core.exceptions import NON_FIELD_ERRORS, ValidationError
+
+from store.constants import TIMEZONES
 
 
 class Company(models.Model):
@@ -101,6 +105,7 @@ class TableSeat(models.Model):
 
 
 class Store(models.Model):
+    TIMEZONES = tuple(zip(pytz.all_timezones, pytz.all_timezones))
     company = models.ForeignKey(Company, on_delete=models.CASCADE)
     store_id = models.CharField(max_length=25, unique=True)
     name = models.CharField(max_length=25, blank=True, null=True, verbose_name="Store Name")
@@ -121,6 +126,7 @@ class Store(models.Model):
     pickup_message = models.CharField(max_length=100, default='', verbose_name="Message for 'Pickup & Bar' type")
     curside_message = models.CharField(max_length=100, default='',
                                        verbose_name="Message for 'Delivering to Car/Curbside' type")
+    timezone = models.CharField(choices=TIMEZONES, default='UTC', max_length=50)
 
     class Meta:
         verbose_name = "Store"
@@ -153,6 +159,7 @@ class Store(models.Model):
         return False
 
     def clean(self):
+        django.utils.timezone.activate(pytz.timezone(self.timezone))
         if not self.store_id.startswith("{}.".format(self.company.company_id)):
             raise ValidationError({"store_id": "Store ID should start with '{Company ID}.'"})
         ip_address_valid = True

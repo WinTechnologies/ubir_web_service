@@ -1,3 +1,4 @@
+import pytz
 import os
 import base64
 import random
@@ -129,6 +130,7 @@ class CustomVerificationViewSet(VerificationViewSet):
         company_id = request.data.pop('companyId')
         store_id = request.data.pop('storeId')
         table_id = request.data.pop('tableId')
+        store = Store.objects.get(store_id=store_id)
         phone_number_without_code = request.data['phone_number_without_code']
         company = Company.objects.get(company_id=company_id)
         specific_phone_number_prefix = company.specific_phone_number_prefix
@@ -141,10 +143,6 @@ class CustomVerificationViewSet(VerificationViewSet):
             else:
                 ip = request.META.get('REMOTE_ADDR')
             request_ip_address = ip
-            try:
-                store = Store.objects.get(store_id=store_id)
-            except Store.DoesNotExist:
-                return response.Ok({"error": "Store does not exist."})
             if not store.ip_addresses:
                 return response.Ok({"error": "Store does not have IP addresses defined yet."})
             if "0.0.0.0" not in store.ip_addresses:
@@ -177,7 +175,7 @@ class CustomVerificationViewSet(VerificationViewSet):
             customer.dining_type = dining_type
             customer.parking_space = parking_space
             customer.is_in_store = True
-            customer.start_time = datetime.now()
+            customer.start_time = datetime.now(pytz.timezone(store.timezone))
             session_token = "".join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(25))
             customer.session_token = session_token
             customer.save()
@@ -200,6 +198,7 @@ class CustomVerificationViewSet(VerificationViewSet):
         company_id = request.data.pop('companyId')
         store_id = request.data.pop('storeId')
         table_id = request.data.pop('tableId')
+        store = Store.objects.get(store_id=store_id)
         serializer = SMSVerificationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         phone_number_without_code = request.data['phone_number_without_code']
@@ -213,9 +212,9 @@ class CustomVerificationViewSet(VerificationViewSet):
         customer.is_in_store = True
         customer.session_token = request.data['session_token']
         table_seat = TableSeat.objects.get(table_id=store_id + '.' + table_id, table_seat=table_id)
-        table_seat.last_time_status_changed = datetime.now()
-        table_seat.seated_time = datetime.now()
-        table_seat.last_time_customer_tap = datetime.now()
+        table_seat.last_time_status_changed = datetime.now(pytz.timezone(store.timezone))
+        table_seat.seated_time = datetime.now(pytz.timezone(store.timezone))
+        table_seat.last_time_customer_tap = datetime.now(pytz.timezone(store.timezone))
         table_seat.action_status = TableSeat.OCCUPIED
         table_seat.save()
         customer.save()
@@ -236,6 +235,7 @@ class CustomVerificationViewSet(VerificationViewSet):
         number_in_party = request.data['number_in_party']
         selected_dining_type = request.data['selected_dining_type']
         parking_space = request.data['parking_space']
+        store = Store.objects.get(store_id=store_id)
         serializer = SMSVerificationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         phone_number_without_code = request.data['phone_number_without_code']
@@ -255,6 +255,6 @@ class CustomVerificationViewSet(VerificationViewSet):
         customer.parking_space = parking_space
         customer.is_in_store = True
         customer.session_token = request.data['session_token']
-        customer.start_time = datetime.now()
+        customer.start_time = datetime.now(pytz.timezone(store.timezone))
         customer.save()
         return response.Ok({"message": "Security code is valid."})
