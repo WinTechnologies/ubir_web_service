@@ -48,6 +48,7 @@ class TableSeatSerializer(serializers.ModelSerializer):
             customer = Customer.objects.get(store_id=rchop(obj.table_id, "." + obj.table_seat), table_id='wait_list',
                                             assigned_table_id=obj.table_seat, assigned=True)
             customer_name = customer.last_name
+            return customer_name
         except Customer.DoesNotExist:
             customer_name = ''
         try:

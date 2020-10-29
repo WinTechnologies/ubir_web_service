@@ -398,12 +398,22 @@ class ChatConsumer(AsyncWebsocketConsumer):
         elif data['command'] == 'assign_table':
             table_seat = data['table_seat']
             store_id = data['store_id']
-            record_number = data["record_number"]
+            company_id = data['company_id']
+            record_number = data['record_number']
+            api_frontend_url = data['api_frontend_url']
             customer = Customer.objects.get(record_number=record_number)
             customer.assigned = True
             customer.store_id = store_id
             customer.assigned_table_id=table_seat
             customer.save()
+            # Send SMS Message to wake the customer's phone up
+            if customer.phone:
+                customer_url = f'{api_frontend_url}/?companyId={company_id}&storeId={store_id}&tableId=wait_list&wait_list_authenticated=true&session_token={customer.session_token}&phone_number={customer.phone}'
+                try:
+                    sms_text_sender = SMSTextSender()
+                    sms_text_sender.send_assign_message(customer.phone, customer_url)
+                except:
+                    pass
             # table_seat
             response_data = {"record_number": record_number,
                              "phone_number": customer.phone,
@@ -417,7 +427,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
         elif data['command'] == 'seat_table':
             table_seat = data['table_seat']
             store_id = data['store_id']
-            record_number = data["record_number"]
+            company_id = data['company_id']
+            record_number = data['record_number']
+            api_frontend_url = data['api_frontend_url']
             store = Store.objects.get(store_id=store_id)
             response_data = {}
             customer = Customer.objects.get(record_number=record_number)
@@ -432,10 +444,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
             customer.assigned_table_id = table_seat
             customer.save()
             # Send SMS Message to wake the customer's phone up
+            customer_url = ''
             if customer.phone:
+                customer_url = f'{api_frontend_url}/?companyId={company_id}&storeId={store_id}&tableId=wait_list&wait_list_authenticated=true&session_token={customer.session_token}&phone_number={customer.phone}'
                 try:
                     sms_text_sender = SMSTextSender()
-                    sms_text_sender.send_message(customer.phone)
+                    sms_text_sender.send_seat_message(customer.phone, customer_url)
                 except:
                     pass
             table_seat = TableSeat.objects.get(table_seat=table_seat, table_id=store_id + '.' + table_seat)

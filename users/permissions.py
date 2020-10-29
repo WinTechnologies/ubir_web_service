@@ -40,7 +40,7 @@ class IsOnTable(BasePermission):
                 return True
         except:
             pass
-        return True
+        return False
 
 
 class IsServiceman(BasePermission):
