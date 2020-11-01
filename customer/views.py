@@ -5,11 +5,15 @@ import random
 import string
 
 from datetime import datetime
+from django.db.models import Q
 from rest_framework import status
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny
+from rest_framework.authtoken.models import Token
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 
 from phone_verify.api import VerificationViewSet
 from phone_verify.serializers import PhoneSerializer, SMSVerificationSerializer
@@ -17,9 +21,13 @@ from phone_verify.services import send_security_code_and_generate_session_token
 from phone_verify.base import response
 
 from .models import Customer, UBIRWiFi
-from store.models import Store, Company, DiningType, TableSeat
+from chat.models import Message
+from order.models import Order
+from store.models import Store, Company, DiningType, TableSeat, ServiceItem
 from .serializers import UBIRWiFiSerializer
-from users.permissions import IsUBIRLoggedIn
+from chat.serializers import MessageSerializer
+from order.serializers import OrderSerializer
+from users.permissions import IsUBIRLoggedIn, IsOnTable
 
 
 class UBIRWiFiViewSet(ModelViewSet):
@@ -110,6 +118,49 @@ class CustomVerificationViewSet(VerificationViewSet):
             session_token = "".join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(25))
             customer.session_token = session_token
             customer.save()
+
+            store = Store.objects.get(store_id=store_id)
+            service_item, created = ServiceItem.objects.get_or_create(title='Table Has Been Seated')
+            try:
+                order = Order.objects.get(
+                    Q(store=store) & Q(table_id=table_id) & Q(service_item=service_item) & (
+                            Q(status=Order.INPROGRESS) | Q(status=Order.INPROGRESS_PENDING)) & Q(customer=customer))
+                order.status = Order.INPROGRESS_PENDING
+            except:
+                order = None
+                pass
+            if not order:
+                order, created = Order.objects.get_or_create(table_id=table_id,
+                                                             store=store,
+                                                             service_item=service_item,
+                                                             customer=customer,
+                                                             status=Order.PENDING,
+                                                             session_token=customer.session_token)
+            order.quantity = 1
+            order.table_id = table_id
+            if created:
+                order.start_time = datetime.now(pytz.timezone(store.timezone))
+            else:
+                if order.status == Order.COMPLETED:
+                    order.start_time = datetime.now(pytz.timezone(store.timezone))
+            order.save()
+            data = OrderSerializer(instance=order).data
+            data['timer'] = int((datetime.now(pytz.timezone(store.timezone)) - order.start_time).total_seconds())
+
+            channel_layer = get_channel_layer()
+            room_group_name = 'chat_%s' % store_id
+            response_data = {
+                'phone_number': customer.phone,
+                'order': data
+            }
+            async_to_sync(channel_layer.group_send)(
+                room_group_name,
+                {
+                    'type': 'login_table',
+                    'message': response_data
+                }
+            )
+
             return response.Ok({"session_token": session_token, "is_authenticated": True})
         else:
             serializer = PhoneSerializer(data=request.data)
@@ -218,6 +269,48 @@ class CustomVerificationViewSet(VerificationViewSet):
         table_seat.action_status = TableSeat.OCCUPIED
         table_seat.save()
         customer.save()
+
+        service_item, created = ServiceItem.objects.get_or_create(title='Table Has Been Seated')
+        try:
+            order = Order.objects.get(
+                Q(store=store) & Q(table_id=table_seat.table_seat) & Q(service_item=service_item) & (
+                        Q(status=Order.INPROGRESS) | Q(status=Order.INPROGRESS_PENDING)) & Q(customer=customer))
+            order.status = Order.INPROGRESS_PENDING
+        except:
+            order = None
+            pass
+        if not order:
+            order, created = Order.objects.get_or_create(table_id=table_seat.table_seat,
+                                                         store=store,
+                                                         service_item=service_item,
+                                                         customer=customer,
+                                                         status=Order.PENDING,
+                                                         session_token=customer.session_token)
+        order.quantity = 1
+        order.table_id = table_seat.table_seat
+        if created:
+            order.start_time = datetime.now(pytz.timezone(store.timezone))
+        else:
+            if order.status == Order.COMPLETED:
+                order.start_time = datetime.now(pytz.timezone(store.timezone))
+        order.save()
+        data = OrderSerializer(instance=order).data
+        data['timer'] = int((datetime.now(pytz.timezone(store.timezone)) - order.start_time).total_seconds())
+
+        channel_layer = get_channel_layer()
+        room_group_name = 'chat_%s' % store_id
+        response_data = {
+            'phone_number': customer.phone,
+            'order': data
+        }
+        async_to_sync(channel_layer.group_send)(
+            room_group_name,
+            {
+                'type': 'login_table',
+                'message': response_data
+            }
+        )
+
         return response.Ok({"message": "Security code is valid."})
 
     @action(

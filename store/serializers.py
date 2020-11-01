@@ -1,10 +1,13 @@
 import pytz
 from datetime import datetime
 from rest_framework import serializers
+from django.db.models import Q
 
 from .models import Store, ServiceItem, TableSeat
 from customer.models import Customer
+from order.models import Order
 from .utils import rchop
+
 
 class TableSeatSerializer(serializers.ModelSerializer):
     location = serializers.SerializerMethodField()
@@ -21,7 +24,10 @@ class TableSeatSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_location(self, obj):
-        return obj.location.title
+        if obj.location:
+            return obj.location.title
+        else:
+            ''
 
     def get_timer(self, obj):
         store_id = rchop(obj.table_id, "." + obj.table_seat)
@@ -69,6 +75,12 @@ class TableSeatSerializer(serializers.ModelSerializer):
             customer = Customer.objects.get(store_id=rchop(obj.table_id, "." + obj.table_seat), table_id=obj.table_seat, seated=True, is_in_store=True)
             customer_name = customer.seated
         except Customer.DoesNotExist:
+            customer_name = False
+        try:
+            order = Order.objects.get(Q(store__store_id=rchop(obj.table_id, "." + obj.table_seat)) & Q(table_id=obj.table_seat) & Q(service_item__title='Clean & Disinfect Table') & ~Q(status=Order.COMPLETED))
+            if order.status != Order.COMPLETED:
+                customer_name = True
+        except Order.DoesNotExist:
             customer_name = False
         return customer_name
 

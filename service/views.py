@@ -14,6 +14,7 @@ from customer.models import Customer
 from chat.models import Message
 from .serializers import ServicemanSerializer
 from order.serializers import OrderSerializer
+from store.serializers import TableSeatSerializer
 from .utils import SMSTextSender
 from users.permissions import IsServiceman
 
@@ -95,7 +96,7 @@ class ServiceViewSet(ModelViewSet):
         except ObjectDoesNotExist:
             return Response({"message": "Internal Server Error"})
 
-    @action(detail=False, methods=['post'], url_path='get_order_information')
+    @action(detail=False, methods=['post'], permission_classes=[IsServiceman], url_path='get_order_information')
     def get_order_information(self, request):
         try:
             table_ids = []
@@ -111,6 +112,20 @@ class ServiceViewSet(ModelViewSet):
                 data['timer'] = int((datetime.now(pytz.timezone(serviceman.store.timezone)) - order.start_time).total_seconds())
                 response_data.append(data)
             return Response(response_data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"message": "Please verify your phone number."})
+
+    @action(detail=False, methods=['post'], permission_classes=[IsServiceman], url_path='get_table_status')
+    def get_table_status(self, request):
+        try:
+            table_ids = []
+            store_id = request.data['store_id']
+            serviceman = Serviceman.objects.get(user=request.user)
+            serviceman_configs = ServicemanConfig.objects.filter(serviceman=serviceman)
+            for serviceman_config in serviceman_configs:
+                table_ids.append(store_id + '.' + serviceman_config.table_seat)
+            table_seats = TableSeat.objects.filter(table_id__in=table_ids)
+            return Response(TableSeatSerializer(table_seats, many=True).data, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"message": "Please verify your phone number."})
 

@@ -12,6 +12,7 @@ from order.models import Order
 from chat.models import Message
 from .models import Store, Company
 from .serializers import StoreSerializer, ServiceItemSerializer
+from chat.serializers import MessageSerializer
 from users.permissions import IsOnTable, IsUBIRLoggedIn
 
 
@@ -19,6 +20,14 @@ class StoreViewSet(ModelViewSet):
     serializer_class = StoreSerializer
     queryset = Store.objects.all()
     http_method_names = ['post']
+
+    @action(detail=False, methods=['POST'], permission_classes=[IsOnTable], url_path='get_message_history')
+    def get_message_history(self, request):
+        store_id = request.data['storeId']
+        phone_number = request.data['phone_number']
+        messages = Message.objects.filter(store_id=store_id, table_id='wait_list', phone=phone_number,
+                                          is_seen=False).order_by("created_at")
+        return Response(MessageSerializer(messages, many=True).data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['post'], permission_classes=[IsOnTable], url_path='get_store_information')
     def get_store_information(self, request):
@@ -188,6 +197,7 @@ class StoreViewSet(ModelViewSet):
                     longest = int(longest)
             average = int(sum / len(customers))
         customer = Customer.objects.get(phone=phone_number)
+        messages = Message.objects.filter(store_id=store_id, table_id='wait_list', phone=phone_number, is_seen=False).order_by("created_at")
         response = {
             "full_name": customer.full_name(),
             "first_name": customer.first_name,
@@ -202,6 +212,7 @@ class StoreViewSet(ModelViewSet):
             "sent_message": sent_message,
             "parking_space": customer.parking_space,
             "waked": customer.waked,
-            "assigned_table_id": customer.assigned_table_id
+            "assigned_table_id": customer.assigned_table_id,
+            "message_history": MessageSerializer(messages, many=True).data
         }
         return Response(response, status=status.HTTP_200_OK)

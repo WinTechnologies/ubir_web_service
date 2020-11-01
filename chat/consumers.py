@@ -116,7 +116,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 table_seat = TableSeat.objects.get(table_seat=table_seat,
                                                    table_id=store.store_id + '.' + table_seat)
                 table_seat.action_status = TableSeat.CLEANING
-                table_seat.last_time_status_changed = datetime.now(pytz.timezone(store.timezone))
+                # table_seat.last_time_status_changed = datetime.now(pytz.timezone(store.timezone))
                 table_seat.save()
                 data['table_status'] = TableSeat.CLEANING
                 service_log = ServiceLog(company=store.company.name, store=store.name, login=serviceman.user.username,
@@ -150,6 +150,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             order.save()
             data = OrderSerializer(instance=order).data
             data['phone_number'] = phone_number
+            data['seated'] = False
             item_title = order.service_item.title
             store = Store.objects.get(store_id=store_id)
             token = Token.objects.get(key=token)
@@ -356,6 +357,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             table_seat = data['table_seat']
             store_id = data['store_id']
             service_item_title = data['service_item_title']
+            store = Store.objects.get(store_id=store_id)
             service_item, created = ServiceItem.objects.get_or_create(title=service_item_title)
             token = Token.objects.get(key=token)
             serviceman = Serviceman.objects.get(user=token.user)
@@ -383,9 +385,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 table_seat = TableSeat.objects.get(table_seat=table_seat, table_id=store_id + '.' + table_seat)
                 table_seat.seated_time = None
                 table_seat.ordered_time = None
-                table_seat.action_status = TableSeat.AVAILABLE
+                table_seat.action_status = TableSeat.CLEANING
+                table_seat.last_time_status_changed = datetime.now(pytz.timezone(store.timezone))
                 table_seat.save()
-                response_data = {"message": "success", "store_id": store_id, "table_id": table_seat.table_seat}
+                response_data = {"message": "success", "store_id": store_id, "table_id": table_seat.table_seat, "table_status": TableSeat.CLEANING}
             except:
                 response_data = {}
             await self.channel_layer.group_send(
@@ -407,6 +410,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             customer.assigned_table_id=table_seat
             customer.save()
             # Send SMS Message to wake the customer's phone up
+            message_text = "Your Table is ready, Please proceed to the Host Stand to be seated."
             if customer.phone:
                 customer_url = f'{api_frontend_url}/?companyId={company_id}&storeId={store_id}&tableId=wait_list&wait_list_authenticated=true&session_token={customer.session_token}&phone_number={customer.phone}'
                 try:
@@ -414,14 +418,24 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     sms_text_sender.send_assign_message(customer.phone, customer_url)
                 except:
                     pass
+                message, created = Message.objects.get_or_create(table_id=customer.table_id,
+                                                                 store_id=store_id,
+                                                                 item_title='',
+                                                                 type=Message.QUESTION,
+                                                                 message=message_text,
+                                                                 phone=customer.phone,
+                                                                 session_token=customer.session_token,
+                                                                 is_seen=False)
+                message.save()
             # table_seat
             response_data = {"record_number": record_number,
                              "phone_number": customer.phone,
                              "last_name": customer.last_name,
                              "table_seat": table_seat,
                              "store_id": store_id,
-                             "message": "Your Table is ready, Please proceed to the Host Stand to be seated.",
-                             "assigned": True}
+                             "message": message_text,
+                             "assigned": True,
+                             "seated": False}
             await self.channel_layer.group_send(self.room_group_name,
                                                 {'type': 'assign_table', 'message': response_data})
         elif data['command'] == 'seat_table':
@@ -472,7 +486,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
                              "table_status": table_seat.action_status,
                              "seated_time": table_seat.seated_time.strftime("%H:%M %p"),
                              "waked": customer.waked,
-                             "assigned_table_id": table_seat.table_seat}
+                             "assigned_table_id": table_seat.table_seat,
+                             "seated": True}
             await self.channel_layer.group_send(self.room_group_name,
                                                 {'type': 'seat_table', 'message': response_data})
         elif data['command'] == 'login_table':
@@ -500,7 +515,33 @@ class ChatConsumer(AsyncWebsocketConsumer):
             for message in messages:
                 message.is_seen = True
                 message.save()
+
+            service_item, created = ServiceItem.objects.get_or_create(title='Table Has Been Seated')
+            try:
+                order = Order.objects.get(Q(store=store) & Q(table_id=table_seat.table_seat) & Q(service_item=service_item) & (
+                        Q(status=Order.INPROGRESS) | Q(status=Order.INPROGRESS_PENDING)) & Q(customer=customer))
+                order.status = Order.INPROGRESS_PENDING
+            except:
+                order = None
+                pass
+            if not order:
+                order, created = Order.objects.get_or_create(table_id=table_seat.table_seat,
+                                                             store=store,
+                                                             service_item=service_item,
+                                                             customer=customer,
+                                                             status=Order.PENDING,
+                                                             session_token=customer.session_token)
+            order.quantity = 1
+            order.table_id = table_seat.table_seat
+            if created:
+                order.start_time = datetime.now(pytz.timezone(store.timezone))
+            else:
+                if order.status == Order.COMPLETED:
+                    order.start_time = datetime.now(pytz.timezone(store.timezone))
+            order.save()
             # table_seat
+            data = OrderSerializer(instance=order).data
+            data['timer'] = int((datetime.now(pytz.timezone(store.timezone)) - order.start_time).total_seconds())
             response_data = {"is_authenticated": True,
                              "session_token": session_token,
                              "phone_number": customer.phone,
@@ -508,7 +549,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
                              "store_id": store_id,
                              "table_status": table_seat.action_status,
                              "seated_time": table_seat.seated_time.strftime("%H:%M %p"),
-                             "waked": customer.waked}
+                             "waked": customer.waked,
+                             "order": data}
             await self.channel_layer.group_send(self.room_group_name,
                                                 {'type': 'login_table', 'message': response_data})
         elif data['command'] == 'clean_table':
