@@ -220,7 +220,7 @@ class CustomVerificationViewSet(VerificationViewSet):
             customer.table_id = table_id
             customer.first_name = first_name
             customer.last_name = last_name
-            if isinstance(number_in_party, int):
+            if number_in_party.isdigit():
                 customer.number_in_party = number_in_party
             dining_type = DiningType.objects.get(title=selected_dining_type)
             customer.dining_type = dining_type
@@ -341,7 +341,7 @@ class CustomVerificationViewSet(VerificationViewSet):
         customer.table_id = table_id
         customer.first_name = first_name
         customer.last_name = last_name
-        if isinstance(number_in_party, int):
+        if number_in_party.isdigit():
             customer.number_in_party = number_in_party
         dining_type = DiningType.objects.get(title=selected_dining_type)
         customer.dining_type = dining_type

@@ -29,6 +29,17 @@ class StoreViewSet(ModelViewSet):
                                           is_seen=False).order_by("created_at")
         return Response(MessageSerializer(messages, many=True).data, status=status.HTTP_200_OK)
 
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny], url_path='get_store_logo')
+    def get_store_logo(self, request):
+        store_id = request.data['store_id']
+        store = Store.objects.get(store_id=store_id)
+        response_data = {}
+        if store.logo and hasattr(store.logo, 'url'):
+            response_data['store_logo'] = store.logo.url
+        else:
+            response_data['store_logo'] = ''
+        return Response(response_data, status=status.HTTP_200_OK)
+
     @action(detail=False, methods=['post'], permission_classes=[IsOnTable], url_path='get_store_information')
     def get_store_information(self, request):
         phone_number = request.data['phone_number']
@@ -74,18 +85,6 @@ class StoreViewSet(ModelViewSet):
             response_data['order_rank'] = store.order_rank
             response_data['pickup_message'] = store.pickup_message
             response_data['curside_message'] = store.curside_message
-            return Response(response_data, status=status.HTTP_200_OK)
-        except ObjectDoesNotExist:
-            return Response({"message": "Please verify your phone number."})
-
-    @action(detail=False, methods=['post'], permission_classes=[IsUBIRLoggedIn], url_path='get_store_logo')
-    def get_store_logo(self, request):
-        company_id = request.data['companyId']
-        store_id = request.data['storeId']
-        response_data = {}
-        try:
-            store = Store.objects.get(store_id=store_id)
-            response_data['store_logo'] = store.logo.url
             return Response(response_data, status=status.HTTP_200_OK)
         except ObjectDoesNotExist:
             return Response({"message": "Please verify your phone number."})
