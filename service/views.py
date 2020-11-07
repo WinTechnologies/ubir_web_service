@@ -42,7 +42,9 @@ class ServiceViewSet(ModelViewSet):
                 table_status = TableSeat.objects.get(table_seat=table_seat.table_seat, table_id=serviceman.store.store_id + '.' + table_seat.table_seat)
                 data['table_status'] = table_status.status  # Open
                 response_data.append(data)
-            return Response({"store_config": response_data, "sms_text_guest_alert": store.sms_text_guest_alert}, status=status.HTTP_200_OK)
+            return Response({"store_config": response_data, "sms_text_guest_alert": store.sms_text_guest_alert,
+                             "timer_turn_yellow": store.timer_turn_yellow, "timer_turn_red": store.timer_turn_red},
+                            status=status.HTTP_200_OK)
         except ObjectDoesNotExist:
             return Response({"message": "Internal Server Error"})
 

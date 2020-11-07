@@ -873,6 +873,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             customer.first_name = data['first_name']
             customer.last_name = data['last_name']
             customer.number_in_party = data['number_in_party']
+            customer.parking_space = data['parking_space']
             dining_type = DiningType.objects.get(title=data['dining_type'])
             customer.dining_type = dining_type
             customer.save()
@@ -887,6 +888,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 "full_name": customer.full_name(),
                 "number_in_party": customer.number_in_party,
                 "dining_type": customer.dining_type.title,
+                "parking_space": customer.parking_space,
             }
             await self.channel_layer.group_send(
                 self.room_group_name,
