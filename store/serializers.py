@@ -18,6 +18,7 @@ class TableSeatSerializer(serializers.ModelSerializer):
     seated_time = serializers.SerializerMethodField()
     ordered = serializers.SerializerMethodField()
     seated = serializers.SerializerMethodField()
+    cleaning = serializers.SerializerMethodField()
 
     class Meta:
         model = TableSeat
@@ -89,18 +90,19 @@ class TableSeatSerializer(serializers.ModelSerializer):
             return seated
         except Customer.DoesNotExist:
             seated = False
+        return seated
+
+    def get_cleaning(self, obj):
+        store_id = rchop(obj.table_id, "." + obj.table_seat)
         try:
             order = Order.objects.get(Q(store__store_id=store_id) &
                                       Q(table_id=obj.table_seat) &
                                       Q(service_item__title='Clean & Disinfect Table') &
                                       ~Q(status=Order.COMPLETED))
-            if order.status != Order.COMPLETED:
-                seated = True
-            else:
-                seated = False
+            cleaning = True
         except Order.DoesNotExist:
-            seated = False
-        return seated
+            cleaning = False
+        return cleaning
 
     def get_phone(self, obj):
         try:

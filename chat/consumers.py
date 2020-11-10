@@ -578,6 +578,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 if order.status == Order.COMPLETED:
                     order.start_time = datetime.now(pytz.timezone(store.timezone))
             order.save()
+            table_seat = TableSeat.objects.get(table_seat=table_seat,
+                                               table_id=store.store_id + '.' + table_seat)
+            table_seat.last_time_status_changed = datetime.now(pytz.timezone(store.timezone))
+            table_seat.save()
             data = OrderSerializer(instance=order).data
             data['timer'] = int((datetime.now(pytz.timezone(store.timezone)) - order.start_time).total_seconds())
             data['table_status'] = TableSeat.CLEANING
