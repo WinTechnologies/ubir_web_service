@@ -530,7 +530,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
             customer.table_id = table_seat
             customer.is_in_store = True
             customer.assigned = False
-            customer.seated = False
             customer.assigned_table_id = ''
             session_token = "".join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(25))
             customer.session_token = session_token
