@@ -142,10 +142,12 @@ class HostViewSet(ModelViewSet):
                                             item_title='', type=Message.ANSWER, is_seen=False).order_by('-created_at').first()
             if answer:
                 data['answer'] = answer.message
+                data['answer_flash'] = answer.flash
             else:
                 data['answer'] = ''
             if not customer.phone:
                 data['answer'] = 'Please tell the customer verbally'
+                data['answer_flash'] = False
             question = Message.objects.filter(store_id=store_id, table_id=customer.table_id, phone=customer.phone,
                                               item_title='', type=Message.QUESTION, is_seen=False).order_by('-created_at').first()
             if question:
@@ -219,5 +221,12 @@ class HostViewSet(ModelViewSet):
         token = request.data['token']
         store_id = request.data['store_id']
         phone_number = request.data['phone_number']
+        messages = Message.objects.filter(store_id=store_id, table_id='wait_list', phone=phone_number, type=Message.ANSWER, is_seen=False)
+        for message in messages:
+            message.flash = False
+            message.save()
         messages = Message.objects.filter(store_id=store_id, table_id='wait_list', phone=phone_number, is_seen=False).order_by("created_at")
-        return Response(MessageSerializer(messages, many=True).data, status=status.HTTP_200_OK)
+        response_data = {}
+        response_data['message_history'] = MessageSerializer(messages, many=True).data
+        response_data['phone_number'] = phone_number
+        return Response(response_data, status=status.HTTP_200_OK)

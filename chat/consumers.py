@@ -14,7 +14,7 @@ from order.models import Order
 from chat.models import Message
 from customer.models import Customer
 from log.models import CustomerLog, ServiceLog
-from store.models import Store, ServiceItem, TableSeat, DiningType
+from store.models import Company, Store, ServiceItem, TableSeat, DiningType
 from chat.serializers import MessageSerializer
 from order.serializers import OrderSerializer
 from .utils import SMSTextSender
@@ -662,11 +662,21 @@ class ChatConsumer(AsyncWebsocketConsumer):
             store_id = data['store_id']
             token = data['token']
             service_item_title = data['message']
+            api_frontend_url = data['api_frontend_url']
+            company_id = data['company_id']
             table_seat = 'Wait'
             store = Store.objects.get(store_id=store_id)
+            company = Company.objects.get(company_id=company_id)
             customer = Customer.objects.get(record_number=record_number)
             customer.assigned = True
             customer.save()
+            if customer.phone:
+                customer_url = f'{api_frontend_url}/?companyId={company_id}&storeId={store_id}&tableId=wait_list&wait_list_authenticated=true&session_token={customer.session_token}&phone_number={customer.phone}'
+                try:
+                    sms_text_sender = SMSTextSender()
+                    sms_text_sender.send_deliver_message(customer.phone, customer_url, company.name, store.name)
+                except:
+                    pass
             service_item, created = ServiceItem.objects.get_or_create(title=service_item_title)
             try:
                 order = Order.objects.get(Q(store=store) & Q(table_id=table_seat) & Q(service_item=service_item) & (
@@ -710,6 +720,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
             token = data['token']
             record_number = data['record_number']
             phone_number = data['phone_number']
+            api_frontend_url = data['api_frontend_url']
+            company_id = data['company_id']
+            store = Store.objects.get(store_id=store_id)
             customer = Customer.objects.get(record_number=record_number)
             customer.is_in_store = False
             customer.seated = False
@@ -736,23 +749,33 @@ class ChatConsumer(AsyncWebsocketConsumer):
             store_id = data['store_id']
             token = data['token']
             service_item_title = data['message']
+            api_frontend_url = data['api_frontend_url']
+            company_id = data['company_id']
             table_seat = 'Wait'
+            company = Company.objects.get(company_id=company_id)
             store = Store.objects.get(store_id=store_id)
             customer = Customer.objects.get(record_number=record_number)
             customer.assigned = True
             customer.save()
+            if customer.phone:
+                customer_url = f'{api_frontend_url}/?companyId={company_id}&storeId={store_id}&tableId=wait_list&wait_list_authenticated=true&session_token={customer.session_token}&phone_number={customer.phone}'
+                try:
+                    sms_text_sender = SMSTextSender()
+                    sms_text_sender.send_pickup_message(customer.phone, customer_url)
+                except:
+                    pass
             service_item, created = ServiceItem.objects.get_or_create(title=service_item_title)
             try:
                 order = Order.objects.get(Q(store=store) & Q(table_id=table_seat) & Q(service_item=service_item) & (
                         Q(status=Order.INPROGRESS) | Q(status=Order.INPROGRESS_PENDING)))
-                order.status = Order.INPROGRESS_PENDING
+                order.status = Order.COMPLETED
             except:
                 order = None
                 pass
             if not order:
                 order, created = Order.objects.get_or_create(table_id=table_seat, store=store,
                                                              service_item=service_item,
-                                                             status=Order.PENDING, session_token=token)
+                                                             status=Order.COMPLETED, session_token=token)
             order.quantity = 1
             order.table_id = table_seat
             order.customer = customer

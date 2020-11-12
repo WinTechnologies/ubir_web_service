@@ -22,6 +22,7 @@ class Message(models.Model):
     message = models.TextField(null=True, blank=True)
     session_token = models.CharField(max_length=512, null=True, blank=True)
     is_seen = models.BooleanField(default=False)
+    flash = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True, blank=True)
 
     def __str__(self):

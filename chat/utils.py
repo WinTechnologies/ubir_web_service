@@ -11,6 +11,28 @@ class SMSTextSender():
         self.from_phone = os.getenv('FROM')
         self.client = Client(self.account_sid, self.auth_token)
 
+    def send_pickup_message(self, to_phone, customer_url):
+        template = "pickup_message_template.html"
+        context = {
+            "customer_url": customer_url
+        }
+        message = render_to_string(template, context)
+        message = message.encode('utf-8')
+        message = self.client.messages.create(to=to_phone, from_=self.from_phone, body=message)
+        print(message.sid)
+
+    def send_deliver_message(self, to_phone, customer_url, company_name, store_name):
+        template = "deliver_message_template.html"
+        context = {
+            "company_name": company_name,
+            "store_name": store_name,
+            "customer_url": customer_url
+        }
+        message = render_to_string(template, context)
+        message = message.encode('utf-8')
+        message = self.client.messages.create(to=to_phone, from_=self.from_phone, body=message)
+        print(message.sid)
+
     def send_assign_message(self, to_phone, customer_url):
         template = "assign_message_template.html"
         context = {
