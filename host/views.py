@@ -189,9 +189,11 @@ class HostViewSet(ModelViewSet):
         store_id = request.data['store_id']
         store = Store.objects.get(store_id=store_id)
         api_frontend_url = request.data['api_frontend_url']
-        sms_text_sender = SMSTextSender()
+        customer = Customer.objects.get(phone=phone_number)
+        customer_url = f'{api_frontend_url}/?companyId={store.company.company_id}&storeId={store_id}&tableId=wait_list&wait_list_authenticated=true&session_token={customer.session_token}&phone_number={customer.phone}'
         try:
-            sms_text_sender.send_message(store.name, message, api_frontend_url, phone_number)
+            sms_text_sender = SMSTextSender()
+            sms_text_sender.send_message(store.company.name, store.name, message, customer_url, phone_number)
             return response.Ok({"message": "Success"})
         except:
             return response.Ok({"message": "Failed"})
