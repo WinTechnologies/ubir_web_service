@@ -459,13 +459,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
             customer.save()
             # Send SMS Message to wake the customer's phone up
             customer_url = ''
-            # if customer.phone:
-            #     customer_url = f'{api_frontend_url}/?companyId={company_id}&storeId={store_id}&tableId=wait_list&wait_list_authenticated=true&session_token={customer.session_token}&phone_number={customer.phone}'
-            #     try:
-            #         sms_text_sender = SMSTextSender()
-            #         sms_text_sender.send_seat_message(customer.phone, customer_url)
-            #     except:
-            #         pass
+            if customer.phone:
+                customer_url = f'{api_frontend_url}/?companyId={company_id}&storeId={store_id}&tableId=wait_list&wait_list_authenticated=true&session_token={customer.session_token}&phone_number={customer.phone}'
+                try:
+                    sms_text_sender = SMSTextSender()
+                    sms_text_sender.send_seat_message(customer.phone, customer_url)
+                except:
+                    pass
             table_seat = TableSeat.objects.get(table_seat=table_seat, table_id=store_id + '.' + table_seat)
             table_seat.action_status = TableSeat.OCCUPIED
             table_seat.last_time_status_changed = datetime.now(pytz.timezone(store.timezone))
