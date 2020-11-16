@@ -32,6 +32,7 @@ class Common(Configuration):
         'django_better_admin_arrayfield',
         # Your apps
         'users',
+        'host',
         'customer',
         'store',
         'service',

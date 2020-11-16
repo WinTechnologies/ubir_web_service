@@ -195,7 +195,7 @@ class HostViewSet(ModelViewSet):
             sms_text_sender = SMSTextSender()
             sms_text_sender.send_message(store.company.name, store.name, message, customer_url, phone_number)
             return response.Ok({"message": "Success"})
-        except:
+        except Exception as e:
             return response.Ok({"message": "Failed"})
 
     @action(detail=False, methods=['post'], permission_classes=[IsServiceman], url_path='select_dining_option')
