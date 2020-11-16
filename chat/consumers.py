@@ -439,7 +439,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.channel_layer.group_send(self.room_group_name,
                                                 {'type': 'assign_table', 'message': response_data})
         elif data['command'] == 'seat_table':
-            table_seat = data['table_seat']
             store_id = data['store_id']
             company_id = data['company_id']
             record_number = data['record_number']
@@ -447,6 +446,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             store = Store.objects.get(store_id=store_id)
             response_data = {}
             customer = Customer.objects.get(record_number=record_number)
+            table_seat = customer.assigned_table_id
             customer.store_id = store_id
             customer.table_id = table_seat
             customer.is_in_store = True
@@ -455,7 +455,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
             customer.waked = False
             customer.assigned = False
             customer.seated = True
-            customer.assigned_table_id = table_seat
             customer.save()
             # Send SMS Message to wake the customer's phone up
             customer_url = ''
