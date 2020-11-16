@@ -135,12 +135,17 @@ class ServiceViewSet(ModelViewSet):
     def send_sms_text(self, request):
         record_number = request.data['record_number']
         message = request.data['message']
+        store_id = request.data['store_id']
+        store = Store.objects.get(store_id=store_id)
         api_frontend_url = request.data['api_frontend_url']
         try:
             order = Order.objects.get(record_number=record_number)
             to_phone_number = order.customer.phone
+            customer = Customer.objects.get(phone=to_phone_number)
+            # customer_url = f'{api_frontend_url}/?companyId={store.company.company_id}&storeId={store_id}&tableId=wait_list&wait_list_authenticated=true&session_token={customer.session_token}&phone_number={customer.phone}'
+            customer_url = f'{api_frontend_url}/'
             sms_text_sender = SMSTextSender()
-            sms_text_sender.send_message(order.store.name, order.table_id, message, api_frontend_url, to_phone_number)
+            sms_text_sender.send_message(store.company.name, store.name, message, customer_url, to_phone_number)
             return response.Ok({"message": "Success"})
         except Order.DoesNotExist:
             return response.Ok({"message": "Error"})

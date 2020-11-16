@@ -12,7 +12,7 @@ class SMSTextSender():
         self.client = Client(self.account_sid, self.auth_token)
 
     def send_message(self, company_name, store_name, message, customer_url, to_phone):
-        template = "sms_message_template.html"
+        template = "sms_host_message_template.html"
         context = {
             "company_name": company_name,
             "store_name": store_name,
